@@ -1,24 +1,34 @@
 package client;
 
-import java.io.BufferedReader;
+import common.Message;
+import common.MessageType;
+import common.Protocol;
+
+import java.io.DataInputStream;
+import java.io.IOException;
 
 public class ClientListener implements Runnable {
-    private final BufferedReader in;
+    private final DataInputStream in;
     private final MessageHandler handler;
 
-    public ClientListener(BufferedReader in, MessageHandler handler) {
+    public ClientListener(DataInputStream in, MessageHandler handler) {
         this.in = in;
         this.handler = handler;
     }
 
-    @Override public void run() {
+    @Override
+    public void run() {
         try {
-            String line;
-            while ((line = in.readLine()) != null) {
-                if (handler != null) handler.onMessage(line); // đẩy lên UI
+            while (true) {
+                Message m = Protocol.readMessage(in);
+                if (m.type == MessageType.TEXT) {
+                    handler.onText(m.senderId, m.text);
+                } else {
+                    handler.onFile(m.senderId, m.filename, m.data);
+                }
             }
-        } catch (Exception e) {
-            if (handler != null) handler.onMessage("[System] Disconnected: " + e.getMessage());
+        } catch (IOException e) {
+            handler.onText("System", "Disconnected: " + e.getMessage());
         }
     }
 }

@@ -1,49 +1,68 @@
 package server;
 
+import common.Message;
+import common.MessageType;
+import common.Protocol;
+
 import java.io.*;
 import java.net.Socket;
-import java.nio.charset.StandardCharsets;
 
 public class ClientHandler implements Runnable {
-    private final Socket mySocket;
-    private final ChatServer chatServer;
+    private final Socket socket;
+    private final ChatServer server;
     private final String id;
-    private final BufferedReader in;      
-    private final BufferedWriter out;     
 
-    public ClientHandler(Socket mySocket, String id, ChatServer chatServer) {
-        this.mySocket = mySocket;
+    private final DataInputStream  in;
+    private final DataOutputStream out;
+
+    public ClientHandler(Socket socket, String id, ChatServer server) {
+        this.socket = socket;
+        this.server = server;
         this.id = id;
-        this.chatServer = chatServer;
         try {
-            this.in  = new BufferedReader(new InputStreamReader(mySocket.getInputStream(), StandardCharsets.UTF_8));
-            this.out = new BufferedWriter(new OutputStreamWriter(mySocket.getOutputStream(), StandardCharsets.UTF_8));
+            this.in  = new DataInputStream(new BufferedInputStream(socket.getInputStream()));
+            this.out = new DataOutputStream(new BufferedOutputStream(socket.getOutputStream()));
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
     }
 
-    @Override public void run() {
+    public String getId() { return id; }
+
+    @Override
+    public void run() {
         try {
-            String line;
-            while ((line = in.readLine()) != null) {
-                chatServer.broadcastMessage(this.id, line);
+            Protocol.writeText(out, "SYSTEM", "SYS_ID:" + this.id);
+            out.flush();
+
+            // Vòng đọc-broadcast
+            while (true) {
+                Message msg = Protocol.readMessage(in);
+
+                // Ghi đè senderId từ server để client khác biết người gửi thực sự là ai
+                msg.senderId = this.id;
+
+                // Server sẽ broadcast CHO TẤT CẢ (kể cả 'from') — chỉnh ở ChatServer
+                server.broadcast(msg, this);
             }
-        } catch (IOException ignored) {
+        } catch (IOException e) {
+            System.out.println("Client " + id + " disconnected: " + e.getMessage());
         } finally {
-            try { mySocket.close(); } catch (IOException ignored) {}
+            server.removeClient(this);
+            try { socket.close(); } catch (IOException ignored) {}
         }
     }
 
-    public void sendMessage(String message) {
+    public void send(Message m) {
         try {
-            out.write(message);
-            out.write("\n");
+            if (m.type == MessageType.TEXT) {
+                Protocol.writeText(out, m.senderId, m.text);
+            } else {
+                Protocol.writeFile(out, m.senderId, m.filename, m.data);
+            }
             out.flush();
         } catch (IOException e) {
-            e.printStackTrace();
+            System.out.println("Send to " + id + " failed: " + e.getMessage());
         }
     }
-
-    public String getId() { return id; }
 }

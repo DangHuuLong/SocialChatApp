@@ -1,5 +1,6 @@
 package client;
 
 public interface MessageHandler {
-    void onMessage(String message);
+    void onText(String senderId, String text);
+    void onFile(String senderId, String filename, byte[] data);
 }

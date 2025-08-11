@@ -1,10 +1,11 @@
 package server;
 
+import common.Message;
+
+import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.Collections;
-import java.util.List;
-import java.util.ArrayList;
+import java.util.*;
 
 public class ChatServer {
     private static final int PORT = 5000;
@@ -13,29 +14,33 @@ public class ChatServer {
 
     public void startServer() {
         try (ServerSocket serverSocket = new ServerSocket(PORT)) {
-            System.out.println("Server started. Listening on port: " + PORT);
+            System.out.println("Server started at port " + PORT);
 
             while (true) {
-                Socket clientSocket = serverSocket.accept();
-                System.out.println("New client connected: " + clientSocket.getInetAddress().getHostAddress());
-
-                ClientHandler clientHandler =
-                        new ClientHandler(clientSocket, String.valueOf(System.currentTimeMillis()), this);
-                clients.add(clientHandler);
-                new Thread(clientHandler, "Client-" + clientHandler.getId()).start();
+                Socket s = serverSocket.accept();
+                String id = String.valueOf(System.currentTimeMillis());
+                ClientHandler handler = new ClientHandler(s, id, this);
+                clients.add(handler);
+                new Thread(handler, "Client-" + id).start();
+                System.out.println("Client connected: " + id);
             }
-        } catch (Exception e) {
+        } catch (IOException e) {
             e.printStackTrace();
         }
     }
-
-    public void broadcastMessage(String id, String message) {
+    
+    public void broadcast(Message msg, ClientHandler from) {
         synchronized (clients) {
-            for (ClientHandler c : clients) {
-                if (!c.getId().equals(id)) {
-                    c.sendMessage(id + " : " + message);
-                }
-            }
+            for (ClientHandler c : clients)  c.send(msg);
         }
+    }
+
+    public void removeClient(ClientHandler h) {
+        clients.remove(h);
+    }
+
+    // tiện chạy nhanh
+    public static void main(String[] args) {
+        new ChatServer().startServer();
     }
 }
