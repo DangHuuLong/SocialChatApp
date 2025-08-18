@@ -22,12 +22,12 @@ public class ChatClient {
         this.port = port;
     }
 
-    public void connect(MessageHandler handler) throws IOException {
+    public void connect(MessageHandler msgHandler, VoiceHandler voiceHandler) throws IOException {
         socket = new Socket(host, port);
         in  = new DataInputStream(new BufferedInputStream(socket.getInputStream()));
         out = new DataOutputStream(new BufferedOutputStream(socket.getOutputStream()));
 
-        Thread t = new Thread(new ClientListener(in, handler), "ClientListener");
+        Thread t = new Thread(new ClientListener(in, msgHandler, voiceHandler), "ClientListener");
         t.setDaemon(true);
         t.start();
     }
@@ -39,6 +39,18 @@ public class ChatClient {
     public void sendFile(java.io.File file) throws IOException {
         byte[] bytes = java.nio.file.Files.readAllBytes(file.toPath());
         Protocol.writeFile(out, "", file.getName(), bytes);
+    }
+    
+    public void sendVoiceStart() throws IOException {
+        Protocol.writeVoiceStart(out, "");  // senderId để server override
+    }
+
+    public void sendVoiceFrame(byte[] pcm, int len) throws IOException {
+        Protocol.writeVoiceFrame(out, "", pcm, len);
+    }
+
+    public void sendVoiceEnd() throws IOException {
+        Protocol.writeVoiceEnd(out, "");
     }
 
     public void close() {

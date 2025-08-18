@@ -2,21 +2,37 @@ package ui;
 
 import client.ChatClient;
 import client.MessageHandler;
+import client.VoiceHandler;
+import client.VoicePlayer;
+import client.VoiceRecorder;
 
+import javax.sound.sampled.LineUnavailableException;
 import javax.swing.*;
 import java.awt.event.KeyEvent;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
+import java.util.concurrent.ConcurrentHashMap;
 
-public class MainForm extends javax.swing.JFrame {
+public class MainForm extends javax.swing.JFrame implements VoiceHandler {
 
     private ChatClient chatClient;
     private final DateTimeFormatter timeFmt = DateTimeFormatter.ofPattern("HH:mm:ss");
     private final DefaultListModel<FileItem> fileListModel = new DefaultListModel<>();
     private File pendingFileToSend;
+    
+    private final VoiceRecorder voiceRecorder = new VoiceRecorder();
+    private final ConcurrentHashMap<String, VoicePlayer> voicePlayers = new ConcurrentHashMap<>();  // Per sender
+    
+    private String myId;
+    private boolean isRecording = false;
+
+    private boolean windowCloseHookAdded = false;
+
     
     private static class FileItem {
         final String filename;
@@ -53,6 +69,13 @@ public class MainForm extends javax.swing.JFrame {
         
         configureTextArea();
         connectToServer();
+        addWindowListener(new WindowAdapter() {
+            @Override
+            public void windowClosing(WindowEvent e) {
+                stopVoice();
+                if (chatClient != null) chatClient.close();
+            }
+        });
         installEnterToSend();
     }
 
@@ -84,47 +107,140 @@ public class MainForm extends javax.swing.JFrame {
         });
     }
 
-    private String myId;
-
     private void connectToServer() {
-        chatClient = new ChatClient("127.0.0.1", 5000);
+        // Hỏi IP/Port để dùng được cả LAN
+        String host = JOptionPane.showInputDialog(this, "Server IP/Hostname", "127.0.0.1");
+        if (host == null || host.isBlank()) return;
+        String portStr = JOptionPane.showInputDialog(this, "Port", "5000");
+        if (portStr == null || portStr.isBlank()) return;
+
+        int port;
         try {
-            chatClient.connect(new MessageHandler() {
-                @Override public void onText(String senderId, String text) {
-                    SwingUtilities.invokeLater(() -> {
-                        if (text != null && text.startsWith("SYS_ID:")) {
-                            myId = text.substring("SYS_ID:".length()).trim();
-                            return;
-                        }
-                        String display = (myId != null && myId.equals(senderId)) ? "Me" : senderId;
-                        appendMessage(display, text);
-                    });
-                }
-
-                @Override public void onFile(String senderId, String filename, byte[] data) {
-                    SwingUtilities.invokeLater(() -> {
-                        String display = (myId != null && myId.equals(senderId)) ? "Me" : senderId;
-                        appendMessage(display, "[File] " + filename + " (" + data.length + " bytes)");
-                        fileListModel.addElement(new FileItem(filename, data));
-                        int last = fileListModel.getSize() - 1;
-                        if (last >= 0) fileList.ensureIndexIsVisible(last);
-                    });
-                }
-
-            });
-            appendMessage("System", "Connected to server");
-        } catch (Exception e) {
-            JOptionPane.showMessageDialog(this, "Cannot connect: " + e.getMessage(),
-                    "Connection Error", JOptionPane.ERROR_MESSAGE);
+            port = Integer.parseInt(portStr.trim());
+        } catch (NumberFormatException ex) {
+            JOptionPane.showMessageDialog(this, "Port không hợp lệ!", "Error", JOptionPane.ERROR_MESSAGE);
+            return;
         }
 
-        this.addWindowListener(new java.awt.event.WindowAdapter() {
-            @Override public void windowClosing(java.awt.event.WindowEvent e) {
-                if (chatClient != null) chatClient.close();
+        chatClient = new ChatClient(host.trim(), port);
+        try {
+            chatClient.connect(new MessageHandler() {
+                @Override
+                public void onText(String senderId, String text) {
+                    SwingUtilities.invokeLater(() -> {
+                        if (text != null && text.startsWith("SYS_ID:")) {
+                            myId = text.substring("SYS_ID:".length());
+                            return;  // Không hiển thị SYS_ID lên UI
+                        }
+                        appendMessage(senderId, text);
+                    });
+                }
+
+                @Override
+                public void onFile(String senderId, String filename, byte[] data) {
+                    SwingUtilities.invokeLater(() -> {
+                        fileListModel.addElement(new FileItem(filename, data));
+                        appendMessage(senderId, "[File received: " + filename + "]");
+                    });
+                }
+            }, this);  // Truyền this làm VoiceHandler
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(this, "Connect failed: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+        }
+
+        // Đăng ký hook đóng cửa sổ (chỉ 1 lần)
+        if (!windowCloseHookAdded) {
+            this.addWindowListener(new java.awt.event.WindowAdapter() {
+                @Override public void windowClosing(java.awt.event.WindowEvent e) {
+                    if (chatClient != null) chatClient.close();
+                }
+            });
+            windowCloseHookAdded = true;
+        }
+    }
+    
+    // Toggle voice chat
+    private void toggleVoiceChat() {
+        if (isRecording) {
+            stopVoice();
+        } else {
+            startVoice();
+        }
+    }
+
+    private void startVoice() {
+        try {
+            voiceRecorder.start(myId,
+                    (buf, len) -> {
+                        try {
+                            chatClient.sendVoiceFrame(buf, len);
+                        } catch (Exception e) {
+                            appendMessage("SYSTEM", "Voice frame send failed: " + e.getMessage());
+                        }
+                    },
+                    () -> {
+                        try {
+                            chatClient.sendVoiceStart();
+                        } catch (Exception e) {
+                            appendMessage("SYSTEM", "Voice start send failed: " + e.getMessage());
+                        }
+                    },
+                    () -> {
+                        try {
+                            chatClient.sendVoiceEnd();
+                        } catch (Exception e) {
+                            appendMessage("SYSTEM", "Voice end send failed: " + e.getMessage());
+                        }
+                    }
+            );
+            isRecording = true;
+            voiceChat.setText("Stop Voice");  // Toggle text nút
+            appendMessage("SYSTEM", "Bắt đầu ghi âm...");
+        } catch (LineUnavailableException e) {
+            JOptionPane.showMessageDialog(this, "Mic unavailable: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private void stopVoice() {
+        voiceRecorder.stop();
+        isRecording = false;
+        voiceChat.setText("Voice Chat");  // Reset text nút
+        appendMessage("SYSTEM", "Dừng ghi âm.");
+    }
+
+    // Implement VoiceHandler   
+    @Override
+    public void onVoiceStart(String senderId) {
+        SwingUtilities.invokeLater(() -> {
+            appendMessage(senderId, "[Bắt đầu voice chat]");
+            try {
+                VoicePlayer player = new VoicePlayer();
+                player.start();
+                voicePlayers.put(senderId, player);
+            } catch (LineUnavailableException e) {
+                appendMessage("SYSTEM", "Player start failed for " + senderId + ": " + e.getMessage());
             }
         });
     }
+    
+    @Override
+    public void onVoiceFrame(String senderId, byte[] pcm) {
+        VoicePlayer player = voicePlayers.get(senderId);
+        if (player != null) {
+            player.enqueue(pcm);
+        }
+    }
 
+    @Override
+    public void onVoiceEnd(String senderId) {
+        SwingUtilities.invokeLater(() -> {
+            appendMessage(senderId, "[Kết thúc voice chat]");
+            VoicePlayer player = voicePlayers.remove(senderId);
+            if (player != null) {
+                player.stop();
+            }
+        });
+    }
 
     private void sendCurrentText() {
     String message = messageInputField.getText().trim();
@@ -217,6 +333,11 @@ public class MainForm extends javax.swing.JFrame {
         jScrollPane2.setViewportView(fileList);
 
         voiceChat.setText("Voice");
+        voiceChat.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                voiceChatActionPerformed(evt);
+            }
+        });
 
         javax.swing.GroupLayout layout = new javax.swing.GroupLayout(getContentPane());
         getContentPane().setLayout(layout);
@@ -283,6 +404,11 @@ public class MainForm extends javax.swing.JFrame {
     private void messageInputFieldActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_messageInputFieldActionPerformed
         // TODO add your handling code here:
     }//GEN-LAST:event_messageInputFieldActionPerformed
+
+    private void voiceChatActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_voiceChatActionPerformed
+        // TODO add your handling code here:
+        toggleVoiceChat();
+    }//GEN-LAST:event_voiceChatActionPerformed
 
     /**
      * @param args the command line arguments

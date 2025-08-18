@@ -31,13 +31,20 @@ public class ChatServer {
     
     public void broadcast(Message msg, ClientHandler from) {
         synchronized (clients) {
-            for (ClientHandler c : clients)  c.send(msg);
+                for (ClientHandler c : clients) {
+                    if (msg.type.isVoice() && c == from) continue;
+                    c.send(msg);
+                }
         }
     }
 
+    public void removeClient(Object h) {
+        if (h instanceof ClientHandler ch) removeClient(ch);
+    }
     public void removeClient(ClientHandler h) {
         clients.remove(h);
     }
+
 
     // tiện chạy nhanh
     public static void main(String[] args) {

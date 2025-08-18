@@ -27,4 +27,25 @@ public class Message {
         m.data = data;
         return m;
     }
+    
+    public static Message voiceStart(String sender) {
+        Message m = new Message();
+        m.type = MessageType.VOICE_START;
+        m.senderId = sender;
+        return m;
+    }
+    public static Message voiceFrame(String sender, byte[] pcm) {
+        Message m = new Message();
+        m.type = MessageType.VOICE_FRAME;
+        m.senderId = sender;
+        m.data = pcm;     
+        return m;
+    }
+    public static Message voiceEnd(String sender) {
+        Message m = new Message();
+        m.type = MessageType.VOICE_END;
+        m.senderId = sender;
+        return m;
+    }
+
 }

@@ -14,12 +14,14 @@ public class ClientHandler implements Runnable {
 
     private final DataInputStream  in;
     private final DataOutputStream out;
+    
+    private final Object writeLock = new Object();
 
     public ClientHandler(Socket socket, String id, ChatServer server) {
         this.socket = socket;
         this.server = server;
         this.id = id;
-        try {
+        try {   
             this.in  = new DataInputStream(new BufferedInputStream(socket.getInputStream()));
             this.out = new DataOutputStream(new BufferedOutputStream(socket.getOutputStream()));
         } catch (IOException e) {
@@ -55,12 +57,16 @@ public class ClientHandler implements Runnable {
 
     public void send(Message m) {
         try {
-            if (m.type == MessageType.TEXT) {
-                Protocol.writeText(out, m.senderId, m.text);
-            } else {
-                Protocol.writeFile(out, m.senderId, m.filename, m.data);
+            synchronized (writeLock){
+                switch (m.type) {
+                    case TEXT -> Protocol.writeText(out, m.senderId, m.text);
+                    case FILE -> Protocol.writeFile(out, m.senderId, m.filename, m.data);
+                    case VOICE_START -> Protocol.writeVoiceStart(out, m.senderId);
+                    case VOICE_FRAME -> Protocol.writeVoiceFrame(out, m.senderId, m.data, m.data != null ? m.data.length : 0);
+                    case VOICE_END -> Protocol.writeVoiceEnd(out, m.senderId);
+                }    
             }
-            out.flush();
+            
         } catch (IOException e) {
             System.out.println("Send to " + id + " failed: " + e.getMessage());
         }
