@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.text.Font?>
+
+<BorderPane xmlns="http://javafx.com/javafx/24.0.1"
+            xmlns:fx="http://javafx.com/fxml/1"
+            prefWidth="600.0" prefHeight="400.0"
+            fx:controller="client.controller.MainController"
+            style="-fx-background-color: linear-gradient(to bottom right, #E0F2FF, #F5F9FF);">
+
+    <!-- Center: Logo + Tiêu đề + Mô tả + Nút -->
+    <center>
+        <VBox alignment="CENTER" spacing="14" BorderPane.alignment="CENTER">
+            <children>
+
+                <!-- Logo emoji -->
+                <Label text="💬"
+                       style="-fx-font-size: 72px; -fx-opacity: 0.95; -fx-effect: dropshadow(gaussian, rgba(24,130,255,0.35), 18, 0.3, 0, 2);" />
+
+                <!-- Tiêu đề -->
+                <Label text="WELCOME TO SOCIAL CHAT APP" wrapText="true" textAlignment="CENTER">
+                    <font>
+                        <Font name="System Bold" size="22.0"/>
+                    </font>
+                </Label>
+
+                <!-- Mô tả nhỏ -->
+                <Label text="Trò chuyện nhanh, an toàn và cực kỳ tiện lợi ✨"
+                       style="-fx-text-fill: #44546B; -fx-font-size: 13px;"/>
+
+                <!-- Nút hành động -->
+                <HBox alignment="CENTER" spacing="12">
+                    <children>
+                        <Button fx:id="loginBtn" text="🔐  Login" onAction="#onLogin"
+                                style="-fx-background-color: linear-gradient(to bottom, #1882FF, #0F6FDE);
+                                       -fx-text-fill: white; -fx-font-weight: bold;
+                                       -fx-background-radius: 12; -fx-padding: 10 22 10 22;
+                                       -fx-effect: dropshadow(gaussian, rgba(24,130,255,0.35), 10, 0.25, 0, 1);
+                                       -fx-cursor: hand;"/>
+                        <Button fx:id="registerBtn" text="📝  Register" onAction="#onRegister"
+                                style="-fx-background-color: white; -fx-text-fill: #0B5ED7; -fx-font-weight: bold;
+                                       -fx-background-radius: 12; -fx-padding: 10 22 10 22;
+                                       -fx-border-color: #C6DAFF; -fx-border-width: 1; -fx-border-radius: 12;
+                                       -fx-effect: dropshadow(gaussian, rgba(24,130,255,0.15), 8, 0.2, 0, 1);
+                                       -fx-cursor: hand;"/>
+                    </children>
+                </HBox>
+
+            </children>
+            <padding>
+                <Insets top="24" right="24" bottom="24" left="24"/>
+            </padding>
+        </VBox>
+    </center>
+
+    <!-- Footer nhỏ -->
+    <bottom>
+        <HBox alignment="CENTER" BorderPane.alignment="CENTER">
+            <children>
+                <Label text="💡 Tip: Bạn có thể đăng nhập bằng tài khoản đã đăng ký trước đó."
+                       style="-fx-text-fill:#6B7280; -fx-font-size:11px;"/>
+            </children>
+            <padding><Insets top="0" right="0" bottom="12" left="0"/></padding>
+        </HBox>
+    </bottom>
+
+</BorderPane>
