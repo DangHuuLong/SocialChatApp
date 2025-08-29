@@ -1,6 +1,7 @@
 package server.dao;
 
 import java.sql.*;
+import java.time.Instant;
 import java.util.*;
 
 import org.mindrot.jbcrypt.BCrypt;
@@ -78,6 +79,37 @@ public class UserDAO {
                 return null;
             }
         }
+    }
+    
+    public static void setOnline(int userId, boolean online) throws SQLException {
+        String sql = "UPDATE users SET online=?, last_seen=? WHERE id=?";
+        try (Connection c = DBConnection.get();
+             PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setInt(1, online ? 1 : 0);
+            ps.setString(2, online ? null : Instant.now().toString());
+            ps.setInt(3, userId);
+            ps.executeUpdate();
+        }
+    }
+
+    public static Map<Integer, Presence> getPresenceOfAll() throws SQLException {
+        String sql = "SELECT id, online, last_seen FROM users";
+        Map<Integer, Presence> map = new HashMap<>();
+        try (Connection c = DBConnection.get();
+             PreparedStatement ps = c.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                map.put(rs.getInt("id"),
+                        new Presence(rs.getInt("online") == 1, rs.getString("last_seen")));
+            }
+        }
+        return map;
+    }
+
+    public static class Presence {
+        public final boolean online;
+        public final String lastSeenIso; // có thể null
+        public Presence(boolean o, String t) { online=o; lastSeenIso=t; }
     }
 
 }

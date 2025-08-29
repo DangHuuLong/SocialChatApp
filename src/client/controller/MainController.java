@@ -90,6 +90,7 @@ public class MainController {
                         return;
                     }
                     User loggedIn = UserDAO.findByUsername(username.getText());	
+                    UserDAO.setOnline(loggedIn.getId(), true); 
                     goToHome(loggedIn);
                 }
             } catch (SQLException e) {
@@ -110,7 +111,7 @@ public class MainController {
             FXMLLoader loader = new FXMLLoader(getClass().getResource("/client/view/Home.fxml"));
             Parent root = loader.load();
 
-            client.controller.HomeController homeController = loader.getController();
+            HomeController homeController = loader.getController();
             homeController.setCurrentUser(loggedInUser);
             homeController.loadUsers();  
 
@@ -118,6 +119,10 @@ public class MainController {
             scene.getStylesheets().add(getClass().getResource("/client/view/chat.css").toExternalForm());
             stage.setScene(scene);
             stage.centerOnScreen();
+            
+            stage.setOnCloseRequest(ev -> {
+                try { UserDAO.setOnline(loggedInUser.getId(), false); } catch (Exception ignore) {}
+            });
         } catch (Exception e) {
             e.printStackTrace();
             new Alert(Alert.AlertType.ERROR, "Không thể mở giao diện Home:\n" + e.getMessage()).showAndWait();

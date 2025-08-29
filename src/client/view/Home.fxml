@@ -33,39 +33,8 @@
                                 <Insets top="10" right="10" bottom="10" left="10"/>
                             </padding>
 
-                            <!-- Mẫu một item: HBox(Image, VBox(tên, tin nhắn gần đây)) -->
-                            <HBox spacing="10" styleClass="chat-item">
-                                <children>
-                                    <ImageView fitWidth="40" fitHeight="40" pickOnBounds="true" preserveRatio="true">
-									    <image>
-									        <Image url="@images/default user.png"/>
-									    </image>
-									</ImageView>
-                                    <VBox spacing="2" HBox.hgrow="ALWAYS">
-                                        <children>
-                                            <Label text="Nhóm Lập Trình" styleClass="chat-name"/>
-                                            <Label text="Bạn: Gửi file thiết kế nhé" styleClass="chat-last"/>
-                                        </children>
-                                    </VBox>
-                                </children>
-                            </HBox>
-
-                            <HBox spacing="10" styleClass="chat-item">
-                                <children>
-                                    <ImageView fitWidth="40" fitHeight="40" pickOnBounds="true" preserveRatio="true">
-									    <image>
-									        <Image url="@images/default user.png"/>
-									    </image>
-									</ImageView>
-                                    <VBox spacing="2" HBox.hgrow="ALWAYS">
-                                        <children>
-                                            <Label text="Anh Nam (Mobile)" styleClass="chat-name"/>
-                                            <Label text="Đã nhận: OK" styleClass="chat-last"/>
-                                        </children>
-                                    </VBox>
-                                </children>
-                            </HBox>
-
+                            <!-- Các đoạn chat sẽ xuất hiện tại đây -->
+                            
                         </VBox>
                     </content>
                 </ScrollPane>
@@ -293,7 +262,7 @@
 						        <Image url="@images/default user.png"/>
 						    </image>
 						</ImageView>
-                        <Label text="Nhóm Lập Trình" styleClass="info-name"/>
+                        <Label fx:id="infoName" text="Nhóm Lập Trình" styleClass="info-name"/>
                         <Label text="Online" styleClass="chat-status-online"/>
                     </children>
                 </VBox>

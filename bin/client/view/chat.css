@@ -38,6 +38,7 @@
 
 /* Item trong danh sách chat */
 .chat-item {
+	-fx-background-color: #ffffff;
     -fx-padding: 8;
     -fx-background-radius: 10;
     -fx-cursor: hand;
