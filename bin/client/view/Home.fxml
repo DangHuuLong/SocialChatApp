@@ -263,7 +263,7 @@
 						    </image>
 						</ImageView>
                         <Label fx:id="infoName" text="Nhóm Lập Trình" styleClass="info-name"/>
-                        <Label text="Online" styleClass="chat-status-online"/>
+                        <Label fx:id="chatStatus" text="Online" styleClass="chat-status-online"/>
                     </children>
                 </VBox>
 
