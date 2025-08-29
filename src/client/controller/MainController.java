@@ -13,12 +13,14 @@ import javafx.geometry.Insets;
 import java.sql.SQLException;           
 import java.util.Optional;
 
+import client.model.User;
+
 public class MainController {
 
     @FXML private Button loginBtn;
     @FXML private Button registerBtn;
 
-    private final UserDAO userDAO = new UserDAO(); // <-- thêm
+    private final UserDAO userDAO = new UserDAO(); 
 
     @FXML private void onLogin()    { showAuthDialog(AuthMode.LOGIN); }
     @FXML private void onRegister() { showAuthDialog(AuthMode.REGISTER); }
@@ -87,7 +89,8 @@ public class MainController {
                         showAlert(Alert.AlertType.ERROR, "Sai tài khoản hoặc mật khẩu.");
                         return;
                     }
-                    goToHome();
+                    User loggedIn = UserDAO.findByUsername(username.getText());	
+                    goToHome(loggedIn);
                 }
             } catch (SQLException e) {
                 e.printStackTrace();
@@ -100,10 +103,17 @@ public class MainController {
         new Alert(type, msg).showAndWait();
     }
 
-    private void goToHome() {
+    private void goToHome(User loggedInUser) {
         try {
             Stage stage = (Stage) loginBtn.getScene().getWindow();
-            Parent root = FXMLLoader.load(getClass().getResource("/client/view/Home.fxml"));
+
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/client/view/Home.fxml"));
+            Parent root = loader.load();
+
+            client.controller.HomeController homeController = loader.getController();
+            homeController.setCurrentUser(loggedInUser);
+            homeController.loadUsers();  
+
             Scene scene = new Scene(root);
             scene.getStylesheets().add(getClass().getResource("/client/view/chat.css").toExternalForm());
             stage.setScene(scene);
@@ -113,4 +123,5 @@ public class MainController {
             new Alert(Alert.AlertType.ERROR, "Không thể mở giao diện Home:\n" + e.getMessage()).showAndWait();
         }
     }
+
 }
