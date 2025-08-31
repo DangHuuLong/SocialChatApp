@@ -112,4 +112,21 @@ public class UserDAO {
         public Presence(boolean o, String t) { online=o; lastSeenIso=t; }
     }
 
+    public static Presence getPresence(int userId) throws SQLException {
+        String sql = "SELECT online, last_seen FROM users WHERE id = ?";
+        try (Connection c = DBConnection.get();
+             PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setInt(1, userId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    boolean online = rs.getInt("online") == 1;
+                    String lastSeen = rs.getString("last_seen"); // có thể null
+                    return new Presence(online, lastSeen);
+                }
+            }
+        }
+        return null; // không tìm thấy user
+    }
+
+
 }

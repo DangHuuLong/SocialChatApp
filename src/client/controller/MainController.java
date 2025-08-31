@@ -13,6 +13,7 @@ import javafx.geometry.Insets;
 import java.sql.SQLException;           
 import java.util.Optional;
 
+import client.ClientConnection;
 import client.model.User;
 
 public class MainController {
@@ -106,27 +107,45 @@ public class MainController {
 
     private void goToHome(User loggedInUser) {
         try {
-            Stage stage = (Stage) loginBtn.getScene().getWindow();
+            // 1) Tạo kết nối duy nhất ở đây
+            ClientConnection conn = new ClientConnection();
+            boolean ok = conn.connect("127.0.0.1", 5000);
+            if (!ok) {
+                new Alert(Alert.AlertType.ERROR, "Không kết nối được server.").showAndWait();
+                return;
+            }
+            // 2) Gửi LOGIN ngay sau khi connect
+            conn.login(loggedInUser.getUsername());
 
+            // 3) Load Home.fxml 1 lần duy nhất bằng FXMLLoader (để lấy controller)
+            Stage stage = (Stage) loginBtn.getScene().getWindow();
             FXMLLoader loader = new FXMLLoader(getClass().getResource("/client/view/Home.fxml"));
             Parent root = loader.load();
 
-            HomeController homeController = loader.getController();
-            homeController.setCurrentUser(loggedInUser);
-            homeController.loadUsers();  
+            // 4) Truyền user + connection sang HomeController
+            HomeController home = loader.getController();
+            home.setCurrentUser(loggedInUser);
+            home.setConnection(conn);   // <-- rất quan trọng: không tạo kết nối mới trong HomeController
+            home.loadUsers();
 
+            // 5) Chuyển scene
             Scene scene = new Scene(root);
             scene.getStylesheets().add(getClass().getResource("/client/view/chat.css").toExternalForm());
             stage.setScene(scene);
             stage.centerOnScreen();
-            
+
+            // 6) Khi đóng cửa sổ, thoát sạch: set offline + QUIT + close
             stage.setOnCloseRequest(ev -> {
                 try { UserDAO.setOnline(loggedInUser.getId(), false); } catch (Exception ignore) {}
+                try { conn.send("QUIT"); } catch (Exception ignore) {}
+                conn.close();
             });
+
         } catch (Exception e) {
             e.printStackTrace();
             new Alert(Alert.AlertType.ERROR, "Không thể mở giao diện Home:\n" + e.getMessage()).showAndWait();
         }
     }
+
 
 }

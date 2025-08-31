@@ -11,10 +11,14 @@ public class ClientConnection {
     private PrintWriter out;
     private Thread readerThread;
 
+    private Consumer<String> onMessage;
+    private Consumer<Exception> onError;
+
     public boolean connect(String host, int port) {
         try {
             socket = new Socket();
-            socket.connect(new InetSocketAddress(host, port), 2000);
+            socket.connect(new InetSocketAddress(host, port), 5000);
+
             in  = new BufferedReader(new InputStreamReader(socket.getInputStream(), "UTF-8"));
             out = new PrintWriter(new OutputStreamWriter(socket.getOutputStream(), "UTF-8"), true);
             return true;
@@ -23,14 +27,20 @@ public class ClientConnection {
         }
     }
 
-    public void startListener(Consumer<String> onMessage) {
+    public void startListener(Consumer<String> onMessage, Consumer<Exception> onError) {
+        this.onMessage = onMessage;
+        this.onError   = onError;
+
         readerThread = new Thread(() -> {
             try {
                 String line;
                 while ((line = in.readLine()) != null) {
-                    onMessage.accept(line); 
+                    if (onMessage != null) onMessage.accept(line);
                 }
-            } catch (IOException ignored) {}
+                if (onError != null) onError.accept(new EOFException("Server closed connection"));
+            } catch (IOException e) {
+                if (onError != null) onError.accept(e);
+            }
         }, "server-listener");
         readerThread.setDaemon(true);
         readerThread.start();
@@ -44,11 +54,16 @@ public class ClientConnection {
         send("MSG " + text);
     }
 
+    public void sendDirectMessage(String to, String text) {
+        send("DM " + to + " " + text);
+    }
+
+    /** Gửi lệnh QUIT */
     public void quit() {
         send("QUIT");
     }
 
-    public void send(String raw) {
+    public synchronized void send(String raw) {
         if (out != null) out.println(raw);
     }
 
@@ -57,6 +72,11 @@ public class ClientConnection {
     }
 
     public void close() {
-        try { if (socket != null) socket.close(); } catch (IOException ignored) {}
+        try { if (in != null) in.close(); } catch (IOException ignored) {}
+        try { if (out != null) out.close(); } catch (Exception ignored) {}
+        try { if (socket != null && !socket.isClosed()) socket.close(); } catch (IOException ignored) {}
+        if (readerThread != null && readerThread.isAlive()) {
+            readerThread.interrupt();
+        }
     }
 }

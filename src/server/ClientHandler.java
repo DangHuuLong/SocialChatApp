@@ -1,23 +1,33 @@
 package server;
 
+import server.dao.MessageDao;
+import common.Frame;
+import common.MessageType;
+
 import java.io.*;
 import java.net.Socket;
-import java.util.Set;
+import java.sql.SQLException;
 import java.util.Map;
+import java.util.Set;
 
 public class ClientHandler implements Runnable {
     private final Socket socket;
     private final Set<ClientHandler> clients;
     private final Map<String, ClientHandler> online;
+    private final MessageDao messageDao;
 
     private BufferedReader in;
     private PrintWriter out;
-    private String username = "guest";
+    private String username = null;
 
-    public ClientHandler(Socket socket, Set<ClientHandler> clients, Map<String, ClientHandler> online) {
+    public ClientHandler(Socket socket,
+                         Set<ClientHandler> clients,
+                         Map<String, ClientHandler> online,
+                         MessageDao messageDao) {
         this.socket = socket;
         this.clients = clients;
         this.online  = online;
+        this.messageDao = messageDao;
     }
 
     @Override
@@ -33,53 +43,118 @@ public class ClientHandler implements Runnable {
                 line = line.trim();
                 if (line.isEmpty()) continue;
 
-                if (line.startsWith("LOGIN ")) {
-                    String u = line.substring(6).trim();
-                    // TODO: xác thực DB tại đây (username/password)
-                    if (u.isEmpty() || online.containsKey(u)) {
-                        send("ERR LOGIN");
-                    } else {
-                        username = u;
-                        online.put(username, this);
-                        send("OK LOGIN " + username);
-                        broadcast("🔵 " + username + " joined", true);
+                // Tách theo mọi whitespace, không phân biệt hoa/thường
+                String[] parts = line.split("\\s+", 2);
+                String cmd = parts[0].toUpperCase();   // LOGIN / MSG / DM / WHO / QUIT
+                String arg = (parts.length > 1) ? parts[1] : "";
+
+                switch (cmd) {
+                    case "LOGIN" -> handleLogin(arg);
+
+                    case "MSG" -> {
+                        if (!ensureLoggedIn()) break;
+                        String msg = arg; // phần còn lại
+                        broadcast(username + ": " + msg, false);
+                        send("OK SENT");
                     }
 
-                } else if (line.startsWith("MSG ")) {
-                    String msg = line.substring(4);
-                    broadcast(username + ": " + msg, false);
-                    send("OK SENT");
+                    case "DM" -> {
+                        if (!ensureLoggedIn()) break;
+                        String[] dm = arg.split("\\s+", 2);
+                        if (dm.length < 2) { send("ERR BAD_DM"); break; }
+                        String to  = dm[0].trim();
+                        String msgBody = dm[1];
 
-                } else if (line.startsWith("DM ")) {
-                    // DM <user> <message>
-                    int sp = line.indexOf(' ', 3);
-                    if (sp > 3) {
-                        String to = line.substring(3, sp).trim();
-                        String msg = line.substring(sp + 1);
+                        Frame f = new Frame(MessageType.DM, username, to, msgBody);
                         ClientHandler target = online.get(to);
                         if (target != null) {
-                            target.send("[DM] " + username + ": " + msg);
+                            target.send("[DM] " + username + ": " + msgBody);
                             send("OK DM");
+                            try { messageDao.saveSent(f); } catch (SQLException e) { e.printStackTrace(); }
                         } else {
-                            send("ERR USER_OFFLINE");
+                            try {
+                                messageDao.saveQueued(f);
+                                send("OK QUEUED");
+                            } catch (SQLException e) {
+                                send("ERR QUEUE_FAIL");
+                                e.printStackTrace();
+                            }
                         }
-                    } else send("ERR BAD_DM");
+                    }
 
-                } else if ("WHO".equalsIgnoreCase(line)) {
-                    send("ONLINE " + String.join(",", online.keySet()));
+                    case "HISTORY" -> {
+                        if (!ensureLoggedIn()) break;
+                        String[] hp = arg.split("\\s+", 2);
+                        String peer = hp.length >= 1 ? hp[0].trim() : "";
+                        if (peer.isEmpty()) { send("ERR BAD_HISTORY"); break; }
+                        int limit = 50;
+                        if (hp.length == 2) {
+                            try { limit = Math.max(1, Integer.parseInt(hp[1])); } catch (Exception ignore) {}
+                        }
+                        try {
+                            var rows = messageDao.loadConversation(username, peer, limit);
+                            for (var r : rows) {
+                                boolean incoming = !r.sender.equals(username);
+                                if (incoming) send("[HIST IN] " + r.sender + ": " + r.body);
+                                else          send("[HIST OUT] " + r.body);
+                            }
+                            send("OK HISTORY");
+                        } catch (SQLException e) {
+                            send("ERR HISTORY_FAIL");
+                            e.printStackTrace();
+                        }
+                    }
 
-                } else if ("QUIT".equalsIgnoreCase(line)) {
-                    send("BYE");
-                    break;
 
-                } else {
-                    send("ERR UNKNOWN_CMD");
+                    case "WHO" -> {
+                        // WHO có thể cho phép khi chưa login cũng được; tuỳ chọn:
+                        send("ONLINE " + String.join(",", online.keySet()));
+                    }
+
+                    case "QUIT" -> {
+                        send("BYE");
+                        return; // thoát run()
+                    }
+
+                    default -> send("ERR UNKNOWN_CMD");
                 }
             }
         } catch (IOException ignored) {
         } finally {
             cleanup();
         }
+    }
+
+    /* ========= Helpers ========= */
+
+    private void handleLogin(String arg) {
+        String u = arg.trim();
+        if (u.isEmpty() || online.containsKey(u)) {
+            send("ERR LOGIN");
+            return;
+        }
+        username = u;
+        online.put(username, this);
+        send("OK LOGIN " + username);
+        broadcast("🔵 " + username + " joined", true);
+
+        // Giao tin offline từ DB
+        try {
+            var pending = messageDao.loadQueued(username);
+            for (var f : pending) send("[DM] " + f.sender + ": " + f.body);
+            if (!pending.isEmpty()) send("[SYS] Delivered " + pending.size() + " offline messages.");
+        } catch (SQLException e) {
+            send("ERR OFFLINE_DELIVERY");
+            e.printStackTrace();
+        }
+    }
+
+    private boolean ensureLoggedIn() {
+        if (username == null) {
+            send("ERR NOT_LOGGED_IN");
+            return false;
+        }
+        return true;
     }
 
     public void send(String msg) {
