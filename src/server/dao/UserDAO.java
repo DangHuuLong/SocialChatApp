@@ -63,6 +63,27 @@ public class UserDAO {
         }
     }
     
+    public static List<User> searchUsers(String keyword, int excludeUserId) throws SQLException {
+        String sql = "SELECT id, username FROM users " +
+                     "WHERE id <> ? AND username LIKE ? ORDER BY username";
+        try (Connection c = DBConnection.get();
+             PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setInt(1, excludeUserId);
+            ps.setString(2, "%" + keyword + "%"); 
+            try (ResultSet rs = ps.executeQuery()) {
+                List<User> list = new ArrayList<>();
+                while (rs.next()) {
+                    User u = new User();
+                    u.setId(rs.getInt("id"));
+                    u.setUsername(rs.getString("username"));
+                    list.add(u);
+                }
+                return list;
+            }
+        }
+    }
+
+    
     public static User findByUsername(String username) throws SQLException {
         String sql = "SELECT id, username, password FROM users WHERE username = ?";
         try (Connection c = DBConnection.get();

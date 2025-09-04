@@ -126,7 +126,7 @@ public class MainController {
             HomeController home = loader.getController();
             home.setCurrentUser(loggedInUser);
             home.setConnection(conn);   // <-- rất quan trọng: không tạo kết nối mới trong HomeController
-            home.loadUsers();
+            home.reloadAll();
 
             // 5) Chuyển scene
             Scene scene = new Scene(root);

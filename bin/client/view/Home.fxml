@@ -20,7 +20,8 @@
             <children>
                 <Label text="Đoạn chat" styleClass="panel-title"/>	
                 <TextField fx:id="searchField" promptText="Tìm kiếm..."
-                           styleClass="search-field"/>
+                           styleClass="search-field"
+                           onAction="#searchUsers"/>
                 <ScrollPane fitToWidth="true" HBox.hgrow="NEVER" prefHeight="600.0"
                             styleClass="list-scroll">
                     <content>
@@ -111,7 +112,96 @@
                         <Label fx:id="chatStatus" text="" styleClass="chat-status-offline"/>
                     </children>
                 </VBox>
-                <!-- Giữ nguyên phần menu/phụ như ban đầu -->
+                
+                <!-- Sau phần VBox info-header -->
+				<HBox spacing="20" alignment="CENTER">
+				    <children>
+				        <!-- Mời -->
+				        <VBox alignment="CENTER" spacing="4">
+				            <children>
+				                <Label text="👥" style="-fx-font-size: 22px;"/>
+				                <Label text="Mời" style="-fx-font-size: 12px; -fx-text-fill: #374151;"/>
+				            </children>
+				        </VBox>
+				
+				        <!-- Thông báo -->
+				        <VBox alignment="CENTER" spacing="4">
+				            <children>
+				                <Label text="🔔" style="-fx-font-size: 22px;"/>
+				                <Label text="Thông báo" style="-fx-font-size: 12px; -fx-text-fill: #374151;"/>
+				            </children>
+				        </VBox>
+				
+				        <!-- Tìm kiếm -->
+				        <VBox alignment="CENTER" spacing="4">
+				            <children>
+				                <Label text="🔍" style="-fx-font-size: 22px;"/>
+				                <Label text="Tìm kiếm" style="-fx-font-size: 12px; -fx-text-fill: #374151;"/>
+				            </children>
+				        </VBox>
+				    </children>
+					</HBox>
+					
+					<Separator/>
+					
+					<!-- Accordion chứa các mục xổ xuống -->
+					<Accordion fx:id="rightMenu" VBox.vgrow="NEVER">
+					    <panes>
+					
+					        <!-- 1) Thông tin đoạn chat -->
+					        <TitledPane text="Thông tin đoạn chat" animated="true" expanded="false" styleClass="menu-pane">
+					            <content>
+					                <VBox spacing="4" styleClass="submenu">
+					                    <children>
+					                        <Label text="Item 1" styleClass="submenu-item"/>
+					                        <Label text="Item 2" styleClass="submenu-item"/>
+					                        <Label text="Item 3" styleClass="submenu-item"/>
+					                    </children>
+					                </VBox>
+					            </content>
+					        </TitledPane>
+					
+					        <!-- 2) Tùy chỉnh đoạn chat -->
+					        <TitledPane text="Tùy chỉnh đoạn chat" animated="true" expanded="false" styleClass="menu-pane">
+					            <content>
+					                <VBox spacing="4" styleClass="submenu">
+					                    <children>
+					                        <Label text="Theme" styleClass="submenu-item"/>
+					                        <Label text="Emoji" styleClass="submenu-item"/>
+					                        <Label text="Màu chat" styleClass="submenu-item"/>
+					                    </children>
+					                </VBox>
+					            </content>
+					        </TitledPane>
+					
+					        <!-- 3) File phương tiện & File -->
+					        <TitledPane text="File phương tiện &amp; File" animated="true" expanded="false" styleClass="menu-pane">
+					            <content>
+					                <VBox spacing="4" styleClass="submenu">
+					                    <children>
+					                        <Label text="Ảnh" styleClass="submenu-item"/>
+					                        <Label text="Video" styleClass="submenu-item"/>
+					                        <Label text="Tài liệu" styleClass="submenu-item"/>
+					                    </children>
+					                </VBox>
+					            </content>
+					        </TitledPane>
+					
+					        <!-- 4) Quyền riêng tư & hỗ trợ -->
+					        <TitledPane text="Quyền riêng tư &amp; hỗ trợ" animated="true" expanded="false" styleClass="menu-pane">
+					            <content>
+					                <VBox spacing="4" styleClass="submenu">
+					                    <children>
+					                        <Label text="Báo cáo sự cố" styleClass="submenu-item"/>
+					                        <Label text="Cài đặt bảo mật" styleClass="submenu-item"/>
+					                    </children>
+					                </VBox>
+					            </content>
+					        </TitledPane>
+					
+					    </panes>
+					</Accordion>
+
             </children>
             <padding>
                 <Insets top="12" right="12" bottom="12" left="12"/>
