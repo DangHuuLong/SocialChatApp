@@ -297,3 +297,17 @@
     -fx-background-color: #EFF6FF;
     -fx-text-fill: #1882FF;
 }
+
+.empty-state {
+    -fx-background-color: #f3f4f6; /* xám nhạt */
+    -fx-padding: 16;
+}
+.empty-title {
+    -fx-font-size: 16px;
+    -fx-text-fill: #111827;
+    -fx-font-weight: bold;
+}
+.empty-subtitle {
+    -fx-font-size: 12px;
+    -fx-text-fill: #6b7280;
+}

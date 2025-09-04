@@ -13,12 +13,12 @@
       prefWidth="1100.0" prefHeight="700.0"
       stylesheets="@chat.css" spacing="8" styleClass="root-bg">
 
-    <!-- ============ SIDEBAR TRÁI ============ -->
     <children>
+        <!-- ============ SIDEBAR TRÁI ============ -->
         <VBox fx:id="sidebar" prefWidth="260.0" minWidth="220.0" spacing="10"
               styleClass="panel sidebar">
             <children>
-                <Label text="Đoạn chat" styleClass="panel-title"/>	
+                <Label text="Đoạn chat" styleClass="panel-title"/>
                 <TextField fx:id="searchField" promptText="Tìm kiếm..."
                            styleClass="search-field"
                            onAction="#searchUsers"/>
@@ -38,174 +38,155 @@
             </padding>
         </VBox>
 
-        <!-- ============ PANEL GIỮA: Header + Message area + Input bar ============ -->
-        <VBox fx:id="centerArea" spacing="8" HBox.hgrow="ALWAYS" styleClass="panel center-panel">
+        <!-- ============ PANEL GIỮA ============ -->
+        <StackPane fx:id="centerStack" HBox.hgrow="ALWAYS" styleClass="panel center-panel">
+            <!-- LỚP NỘI DUNG THẬT -->
+            <VBox fx:id="centerContent" spacing="8" maxWidth="Infinity">
+                <!-- Header -->
+                <HBox spacing="10" styleClass="chat-header" prefHeight="68.0" alignment="CENTER_LEFT">
+                    <children>
+                        <ImageView fitWidth="44" fitHeight="44" pickOnBounds="true" preserveRatio="true">
+                            <image><Image url="@images/default user.png"/></image>
+                        </ImageView>
+                        <VBox spacing="2">
+                            <children>
+                                <Label fx:id="currentChatName" text="" styleClass="chat-title"/>
+                                <Label fx:id="currentChatStatus" text="" styleClass="chat-status-offline"/>
+                            </children>
+                        </VBox>
+                        <Region HBox.hgrow="ALWAYS"/>
+                        <HBox spacing="8">
+                            <children>
+                                <Button text="Gọi" styleClass="action-btn"/>
+                                <Button text="Video" styleClass="action-btn"/>
+                                <Button text="⋯" styleClass="action-btn"/>
+                                <Button fx:id="logoutBtn" text="🚪 Logout" onAction="#onLogout"
+                                        style="-fx-background-color: #EF4444; -fx-text-fill: white; -fx-background-radius: 8; -fx-padding: 6 14;"/>
+                            </children>
+                        </HBox>
+                    </children>
+                    <padding><Insets top="10" right="12" bottom="10" left="12"/></padding>
+                </HBox>
 
-            <!-- Header -->
-            <HBox spacing="10" styleClass="chat-header" prefHeight="68.0" alignment="CENTER_LEFT">
-                <children>
-                    <ImageView fitWidth="44" fitHeight="44" pickOnBounds="true" preserveRatio="true">
-					    <image>
-					        <Image url="@images/default user.png"/>
-					    </image>
-					</ImageView>
-                    <VBox spacing="2">
-                        <children>
-                            <Label fx:id="currentChatName" text="" styleClass="chat-title"/>
-                            <Label fx:id="currentChatStatus" text="" styleClass="chat-status-offline"/>
-                        </children>
-                    </VBox>
-                    <Region HBox.hgrow="ALWAYS"/>
-                    <HBox spacing="8">
-                        <children>
-                            <Button text="Gọi" styleClass="action-btn"/>
-                            <Button text="Video" styleClass="action-btn"/>
-                            <Button text="⋯" styleClass="action-btn"/>
-			                <Button fx:id="logoutBtn" text="🚪 Logout" onAction="#onLogout"
-			                        style="-fx-background-color: #EF4444; -fx-text-fill: white; 
-			                               -fx-background-radius: 8; -fx-padding: 6 14;"/>
-                        </children>
-                    </HBox>
-                </children>
-                <padding>
-                    <Insets top="10" right="12" bottom="10" left="12"/>
-                </padding>
-            </HBox>
+                <!-- Khu tin nhắn -->
+                <ScrollPane fitToWidth="true" VBox.vgrow="ALWAYS" styleClass="message-scroll">
+                    <content>
+                        <VBox fx:id="messageContainer" spacing="8" fillWidth="true">
+                            <padding><Insets top="12" right="12" bottom="12" left="12"/></padding>
+                        </VBox>
+                    </content>
+                </ScrollPane>
 
-            <!-- Khu tin nhắn -->
-			<ScrollPane fitToWidth="true" VBox.vgrow="ALWAYS" styleClass="message-scroll">
-			    <content>
-			        <VBox fx:id="messageContainer" spacing="8" fillWidth="true">
-			            <padding>
-			                <Insets top="12" right="12" bottom="12" left="12"/>
-			            </padding>
-			            <!-- Tin nhắn sẽ được thêm động từ Controller -->
-			        </VBox>
-			    </content>
-			</ScrollPane>
+                <!-- Input bar -->
+                <HBox spacing="8" styleClass="input-bar" alignment="CENTER_LEFT">
+                    <children>
+                        <Button text="🎤" styleClass="icon-btn"/>
+                        <Button text="📎" styleClass="icon-btn"/>
+                        <TextField fx:id="messageField" promptText="Nhập tin nhắn..." HBox.hgrow="ALWAYS"/>
+                        <Button text="Gửi" styleClass="send-btn"/>
+                    </children>
+                    <padding><Insets top="10" right="12" bottom="10" left="12"/></padding>
+                </HBox>
+            </VBox>
 
-            <!-- Input bar -->
-            <HBox spacing="8" styleClass="input-bar" alignment="CENTER_LEFT">
-                <children>
-                    <Button text="🎤" styleClass="icon-btn"/>
-                    <Button text="📎" styleClass="icon-btn"/>
-                    <TextField fx:id="messageField" promptText="Nhập tin nhắn..." HBox.hgrow="ALWAYS"/>
-                    <Button text="Gửi" styleClass="send-btn"/>
-                </children>
-                <padding>
-                    <Insets top="10" right="12" bottom="10" left="12"/>
-                </padding>
-            </HBox>
-        </VBox>
+            <!-- LỚP PLACEHOLDER -->
+            <VBox fx:id="centerEmpty" alignment="CENTER" spacing="6" styleClass="empty-state" visible="true" managed="true">
+                <Label text="Vui lòng chọn một đoạn chat" styleClass="empty-title"/>
+                <Label text="Chọn một người ở panel bên trái để bắt đầu." styleClass="empty-subtitle"/>
+            </VBox>
+        </StackPane>
 
         <!-- ============ PANEL PHẢI ============ -->
-        <VBox fx:id="infoPanel" prefWidth="280.0" minWidth="240.0" spacing="12" styleClass="panel info-panel">
-            <children>
-                <VBox spacing="10" alignment="CENTER" styleClass="info-header">
-                    <children>
-                        <ImageView fitWidth="84" fitHeight="84" pickOnBounds="true" preserveRatio="true">
-						    <image>
-						        <Image url="@images/default user.png"/>
-						    </image>
-						</ImageView>
-                        <Label fx:id="infoName" text="" styleClass="info-name"/>
-                        <Label fx:id="chatStatus" text="" styleClass="chat-status-offline"/>
-                    </children>
-                </VBox>
-                
-                <!-- Sau phần VBox info-header -->
-				<HBox spacing="20" alignment="CENTER">
-				    <children>
-				        <!-- Mời -->
-				        <VBox alignment="CENTER" spacing="4">
-				            <children>
-				                <Label text="👥" style="-fx-font-size: 22px;"/>
-				                <Label text="Mời" style="-fx-font-size: 12px; -fx-text-fill: #374151;"/>
-				            </children>
-				        </VBox>
-				
-				        <!-- Thông báo -->
-				        <VBox alignment="CENTER" spacing="4">
-				            <children>
-				                <Label text="🔔" style="-fx-font-size: 22px;"/>
-				                <Label text="Thông báo" style="-fx-font-size: 12px; -fx-text-fill: #374151;"/>
-				            </children>
-				        </VBox>
-				
-				        <!-- Tìm kiếm -->
-				        <VBox alignment="CENTER" spacing="4">
-				            <children>
-				                <Label text="🔍" style="-fx-font-size: 22px;"/>
-				                <Label text="Tìm kiếm" style="-fx-font-size: 12px; -fx-text-fill: #374151;"/>
-				            </children>
-				        </VBox>
-				    </children>
-					</HBox>
-					
-					<Separator/>
-					
-					<!-- Accordion chứa các mục xổ xuống -->
-					<Accordion fx:id="rightMenu" VBox.vgrow="NEVER">
-					    <panes>
-					
-					        <!-- 1) Thông tin đoạn chat -->
-					        <TitledPane text="Thông tin đoạn chat" animated="true" expanded="false" styleClass="menu-pane">
-					            <content>
-					                <VBox spacing="4" styleClass="submenu">
-					                    <children>
-					                        <Label text="Item 1" styleClass="submenu-item"/>
-					                        <Label text="Item 2" styleClass="submenu-item"/>
-					                        <Label text="Item 3" styleClass="submenu-item"/>
-					                    </children>
-					                </VBox>
-					            </content>
-					        </TitledPane>
-					
-					        <!-- 2) Tùy chỉnh đoạn chat -->
-					        <TitledPane text="Tùy chỉnh đoạn chat" animated="true" expanded="false" styleClass="menu-pane">
-					            <content>
-					                <VBox spacing="4" styleClass="submenu">
-					                    <children>
-					                        <Label text="Theme" styleClass="submenu-item"/>
-					                        <Label text="Emoji" styleClass="submenu-item"/>
-					                        <Label text="Màu chat" styleClass="submenu-item"/>
-					                    </children>
-					                </VBox>
-					            </content>
-					        </TitledPane>
-					
-					        <!-- 3) File phương tiện & File -->
-					        <TitledPane text="File phương tiện &amp; File" animated="true" expanded="false" styleClass="menu-pane">
-					            <content>
-					                <VBox spacing="4" styleClass="submenu">
-					                    <children>
-					                        <Label text="Ảnh" styleClass="submenu-item"/>
-					                        <Label text="Video" styleClass="submenu-item"/>
-					                        <Label text="Tài liệu" styleClass="submenu-item"/>
-					                    </children>
-					                </VBox>
-					            </content>
-					        </TitledPane>
-					
-					        <!-- 4) Quyền riêng tư & hỗ trợ -->
-					        <TitledPane text="Quyền riêng tư &amp; hỗ trợ" animated="true" expanded="false" styleClass="menu-pane">
-					            <content>
-					                <VBox spacing="4" styleClass="submenu">
-					                    <children>
-					                        <Label text="Báo cáo sự cố" styleClass="submenu-item"/>
-					                        <Label text="Cài đặt bảo mật" styleClass="submenu-item"/>
-					                    </children>
-					                </VBox>
-					            </content>
-					        </TitledPane>
-					
-					    </panes>
-					</Accordion>
+        <StackPane fx:id="rightStack" prefWidth="280.0" minWidth="240.0" styleClass="panel info-panel">
+            <!-- LỚP NỘI DUNG THẬT -->
+            <VBox fx:id="rightContent" spacing="12">
+                <children>
+                    <VBox spacing="10" alignment="CENTER" styleClass="info-header">
+                        <children>
+                            <ImageView fitWidth="84" fitHeight="84" pickOnBounds="true" preserveRatio="true">
+                                <image><Image url="@images/default user.png"/></image>
+                            </ImageView>
+                            <Label fx:id="infoName" text="" styleClass="info-name"/>
+                            <Label fx:id="chatStatus" text="" styleClass="chat-status-offline"/>
+                        </children>
+                    </VBox>
 
-            </children>
-            <padding>
-                <Insets top="12" right="12" bottom="12" left="12"/>
-            </padding>
-        </VBox>
+                    <!-- Hàng icon -->
+                    <HBox spacing="20" alignment="CENTER">
+                        <children>
+                            <VBox alignment="CENTER" spacing="4">
+                                <children><Label text="👥" style="-fx-font-size: 22px;"/><Label text="Mời" style="-fx-font-size: 12px; -fx-text-fill: #374151;"/></children>
+                            </VBox>
+                            <VBox alignment="CENTER" spacing="4">
+                                <children><Label text="🔔" style="-fx-font-size: 22px;"/><Label text="Thông báo" style="-fx-font-size: 12px; -fx-text-fill: #374151;"/></children>
+                            </VBox>
+                            <VBox alignment="CENTER" spacing="4">
+                                <children><Label text="🔍" style="-fx-font-size: 22px;"/><Label text="Tìm kiếm" style="-fx-font-size: 12px; -fx-text-fill: #374151;"/></children>
+                            </VBox>
+                        </children>
+                    </HBox>
+
+                    <Separator/>
+
+                    <Accordion fx:id="rightMenu" VBox.vgrow="NEVER">
+                        <panes>
+                            <TitledPane text="Thông tin đoạn chat" animated="true" expanded="false" styleClass="menu-pane">
+                                <content>
+                                    <VBox spacing="4" styleClass="submenu">
+                                        <children>
+                                            <Label text="Item 1" styleClass="submenu-item"/>
+                                            <Label text="Item 2" styleClass="submenu-item"/>
+                                            <Label text="Item 3" styleClass="submenu-item"/>
+                                        </children>
+                                    </VBox>
+                                </content>
+                            </TitledPane>
+
+                            <TitledPane text="Tùy chỉnh đoạn chat" animated="true" expanded="false" styleClass="menu-pane">
+                                <content>
+                                    <VBox spacing="4" styleClass="submenu">
+                                        <children>
+                                            <Label text="Theme" styleClass="submenu-item"/>
+                                            <Label text="Emoji" styleClass="submenu-item"/>
+                                            <Label text="Màu chat" styleClass="submenu-item"/>
+                                        </children>
+                                    </VBox>
+                                </content>
+                            </TitledPane>
+
+                            <TitledPane text="File phương tiện &amp; File" animated="true" expanded="false" styleClass="menu-pane">
+                                <content>
+                                    <VBox spacing="4" styleClass="submenu">
+                                        <children>
+                                            <Label text="Ảnh" styleClass="submenu-item"/>
+                                            <Label text="Video" styleClass="submenu-item"/>
+                                            <Label text="Tài liệu" styleClass="submenu-item"/>
+                                        </children>
+                                    </VBox>
+                                </content>
+                            </TitledPane>
+
+                            <TitledPane text="Quyền riêng tư &amp; hỗ trợ" animated="true" expanded="false" styleClass="menu-pane">
+                                <content>
+                                    <VBox spacing="4" styleClass="submenu">
+                                        <children>
+                                            <Label text="Báo cáo sự cố" styleClass="submenu-item"/>
+                                            <Label text="Cài đặt bảo mật" styleClass="submenu-item"/>
+                                        </children>
+                                    </VBox>
+                                </content>
+                            </TitledPane>
+                        </panes>
+                    </Accordion>
+                </children>
+                <padding><Insets top="12" right="12" bottom="12" left="12"/></padding>
+            </VBox>
+
+            <!-- LỚP PLACEHOLDER -->
+            <VBox fx:id="rightEmpty" alignment="CENTER" spacing="6" styleClass="empty-state" visible="true" managed="true">
+                <Label text="Chưa chọn đoạn chat" styleClass="empty-title"/>
+                <Label text="Thông tin liên hệ sẽ hiển thị ở đây." styleClass="empty-subtitle"/>
+            </VBox>
+        </StackPane>
     </children>
 </HBox>

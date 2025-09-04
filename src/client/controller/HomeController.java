@@ -10,6 +10,7 @@ import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
+import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 import server.dao.UserDAO;
@@ -33,6 +34,15 @@ public class HomeController {
     // Right panel
     @FXML private Label infoName;
     @FXML private Label chatStatus;
+    
+    @FXML private StackPane centerStack;
+    @FXML private VBox centerContent;
+    @FXML private VBox centerEmpty;
+
+    @FXML private StackPane rightStack;
+    @FXML private VBox rightContent;
+    @FXML private VBox rightEmpty;
+
 
     // ========= Controllers con sau khi tách =========
     private final LeftController leftCtrl  = new LeftController();
@@ -53,8 +63,29 @@ public class HomeController {
         midCtrl.setRightController(rightCtrl);
 
         // Khi click 1 đoạn chat ở panel trái -> mở hội thoại ở giữa & cập nhật panel phải
-        leftCtrl.setOnOpenConversation(user -> midCtrl.openConversation(user));
+        leftCtrl.setOnOpenConversation(user -> {
+            toggleCenterEmpty(false);
+            toggleRightEmpty(false);
+            midCtrl.openConversation(user);
+        });
+        
+        toggleCenterEmpty(true);
+        toggleRightEmpty(true);
     }
+    
+    private void toggleCenterEmpty(boolean showEmpty) {
+        centerEmpty.setVisible(showEmpty);
+        centerEmpty.setManaged(showEmpty);
+        centerContent.setVisible(!showEmpty);
+        centerContent.setManaged(!showEmpty);
+    }
+    private void toggleRightEmpty(boolean showEmpty) {
+        rightEmpty.setVisible(showEmpty);
+        rightEmpty.setManaged(showEmpty);
+        rightContent.setVisible(!showEmpty);
+        rightContent.setManaged(!showEmpty);
+    }
+
 
     // ========= Wiring từ màn trước (MainController) =========
     public void setCurrentUser(User user) {
