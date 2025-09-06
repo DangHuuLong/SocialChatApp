@@ -1,6 +1,7 @@
 package server;
 
 import server.dao.MessageDao;
+import server.signaling.CallRouter;
 import common.Frame;
 import common.MessageType;
 
@@ -42,8 +43,16 @@ public class ClientHandler implements Runnable {
             while ((line = in.readLine()) != null) {
                 line = line.trim();
                 if (line.isEmpty()) continue;
+                
+                if (line.startsWith("CALL_")) {
+                    if (!ensureLoggedIn()) { 
+                        send("ERR NOT_LOGGED_IN"); 
+                        continue; 
+                    }
+                    handleCallCommand(line);  
+                    continue;                 
+                }
 
-                // Tách theo mọi whitespace, không phân biệt hoa/thường
                 String[] parts = line.split("\\s+", 2);
                 String cmd = parts[0].toUpperCase();   // LOGIN / MSG / DM / WHO / QUIT
                 String arg = (parts.length > 1) ? parts[1] : "";
@@ -107,13 +116,12 @@ public class ClientHandler implements Runnable {
 
 
                     case "WHO" -> {
-                        // WHO có thể cho phép khi chưa login cũng được; tuỳ chọn:
                         send("ONLINE " + String.join(",", online.keySet()));
                     }
 
                     case "QUIT" -> {
                         send("BYE");
-                        return; // thoát run()
+                        return; 
                     }
 
                     default -> send("ERR UNKNOWN_CMD");
@@ -135,10 +143,10 @@ public class ClientHandler implements Runnable {
         }
         username = u;
         online.put(username, this);
+        CallRouter.getInstance().register(username, this); 
         send("OK LOGIN " + username);
         broadcast("🔵 " + username + " joined", true);
 
-        // Giao tin offline từ DB
         try {
             var pending = messageDao.loadQueued(username);
             for (var f : pending) send("[DM] " + f.sender + ": " + f.body);
@@ -170,6 +178,7 @@ public class ClientHandler implements Runnable {
 
     private void cleanup() {
         if (username != null) {
+        	CallRouter.getInstance().unregister(username, this);
             online.remove(username, this);
             broadcast("🔴 " + username + " left", true);
         }
@@ -183,4 +192,70 @@ public class ClientHandler implements Runnable {
         try { if (out != null) out.close(); } catch (Exception ignored) {}
         try { if (socket != null && !socket.isClosed()) socket.close(); } catch (IOException ignored) {}
     }
+    
+    // Call
+    public void sendLine(String line) {
+        try {
+            out.println(line); 
+            out.flush();
+        } catch (Exception e) {
+        	e.printStackTrace();
+        }
+    }
+    
+    private void handleCallCommand(String line) {
+        // Format client->server:
+        // CALL_INVITE <toUser> <callId>
+        // CALL_ACCEPT <toUser> <callId>
+        // CALL_REJECT <toUser> <callId>
+        // CALL_CANCEL <toUser> <callId>
+        // CALL_BUSY   <toUser> <callId>
+        // CALL_END    <toUser> <callId>
+        //
+        // CALL_OFFER  <toUser> <callId> <b64sdp>
+        // CALL_ANSWER <toUser> <callId> <b64sdp>
+        // CALL_ICE    <toUser> <callId> <b64cand>
+
+        final var router = CallRouter.getInstance();
+
+        // pay attention: keep payload as one token (limit=4)
+        String[] parts = line.split(" ", 4);
+        String cmd = parts[0];
+
+        // sanity check common 3-part commands
+        if (cmd.equals("CALL_OFFER") || cmd.equals("CALL_ANSWER") || cmd.equals("CALL_ICE")) {
+            if (parts.length < 4) { sendLine("ERR BAD_CALL_SYNTAX"); return; }
+        } else {
+            if (parts.length < 3) { sendLine("ERR BAD_CALL_SYNTAX"); return; }
+        }
+
+        String toUser = parts[1];
+        String callId = parts[2];
+
+        switch (cmd) {
+            case "CALL_INVITE" -> router.invite(username, toUser, callId);
+            case "CALL_ACCEPT" -> router.accept(username, toUser, callId);
+            case "CALL_REJECT" -> router.reject(username, toUser, callId);
+            case "CALL_CANCEL" -> router.cancel(username, toUser, callId);
+            case "CALL_BUSY"   -> router.busy(username, toUser, callId);
+            case "CALL_END"    -> router.end(username, toUser, callId);
+
+            case "CALL_OFFER"  -> {
+                String b64 = parts[3];
+                router.offer(username, toUser, callId, b64);
+            }
+            case "CALL_ANSWER" -> {
+                String b64 = parts[3];
+                router.answer(username, toUser, callId, b64);
+            }
+            case "CALL_ICE"    -> {
+                String b64 = parts[3];
+                router.ice(username, toUser, callId, b64);
+            }
+
+            default -> sendLine("ERR UNKNOWN_CALL_CMD");
+        }
+    }
+
+
 }

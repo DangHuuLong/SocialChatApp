@@ -2,37 +2,48 @@ package client.controller;
 
 import client.ClientConnection;
 import client.model.User;
+import client.signaling.CallSignalListener;
+import client.signaling.CallSignalingService;
 import javafx.application.Platform;
 import javafx.fxml.FXMLLoader;
+import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.*;
+import javafx.stage.Modality;
 import javafx.stage.Stage;
+import javafx.stage.StageStyle;
 import server.dao.UserDAO;
 
 import java.sql.SQLException;
 import java.time.Instant;
 
-public class MidController {
-    // FXML nodes (bind từ HomeController)
+public class MidController implements CallSignalListener {
     private Label currentChatName;
     private Label currentChatStatus;
     private VBox messageContainer;
     private TextField messageField;
     private Button logoutBtn;
 
-    // Tham chiếu sang RightController để cập nhật info panel
     private RightController rightController;
+
+    private CallSignalingService callSvc;
+    private StackPane overlayHost; 
+    private Node overlayRoot;
+    private Stage callStage; 
+    private VideoCallController callCtrl; 
+    private String currentCallId;
+    private String currentPeer;
+    private boolean isCaller = false;
 
     // State / net
     private User currentUser;
     private User selectedUser;
     private ClientConnection connection;
 
-    // ===== Wiring từ HomeController =====
     public void bind(Label currentChatName, Label currentChatStatus,
                      VBox messageContainer, TextField messageField, Button logoutBtn) {
         this.currentChatName = currentChatName;
@@ -70,7 +81,6 @@ public class MidController {
         this.selectedUser = u;
         if (currentChatName != null) currentChatName.setText(u.getUsername());
 
-        // cập nhật header + info panel theo presence
         try {
             UserDAO.Presence p = UserDAO.getPresence(u.getId());
             boolean online = p != null && p.online;
@@ -86,7 +96,6 @@ public class MidController {
             if (rightController != null) rightController.showUser(u, false, null);
         }
 
-        // clear và xin lịch sử
         if (messageContainer != null) messageContainer.getChildren().clear();
         if (connection != null && connection.isAlive()) {
             connection.send("HISTORY " + u.getUsername() + " 50");
@@ -257,12 +266,10 @@ public class MidController {
 
     // ===== Logout =====
     private void onLogout() {
-        // cập nhật offline DB
         try {
             if (currentUser != null) UserDAO.setOnline(currentUser.getId(), false);
         } catch (SQLException ignored) {}
 
-        // đóng kết nối
         if (connection != null) {
             try { connection.send("QUIT"); } catch (Exception ignored) {}
             connection.close();
@@ -270,7 +277,6 @@ public class MidController {
         }
         currentUser = null;
 
-        // quay về Main.fxml
         try {
             Stage stage = (Stage) logoutBtn.getScene().getWindow();
             FXMLLoader loader = new FXMLLoader(getClass().getResource("/client/view/Main.fxml"));
@@ -313,4 +319,106 @@ public class MidController {
             return withDot ? " • " + iso : iso;
         }
     }
+    
+    public void setCallService(CallSignalingService svc) {
+        this.callSvc = svc;
+    }
+    
+    /** HomeController gọi để đưa centerStack cho Mid làm host overlay. */
+    public void setOverlayHost(StackPane host) {
+        this.overlayHost = host;
+    }
+
+    /** (Tuỳ chọn) Gọi từ UI khi bạn muốn chủ động gọi đi */
+    public void startCallTo(client.model.User peerUser) {
+        String peer = peerUser.getUsername();
+        String callId = java.util.UUID.randomUUID().toString();
+        currentPeer = peer; currentCallId = callId; isCaller = true;
+
+        openCallWindow(peer, callId, VideoCallController.Mode.OUTGOING);
+        callSvc.sendInvite(peer, callId);
+    }
+
+
+    @Override public void onInvite(String fromUser, String callId) {
+        Platform.runLater(() -> {
+            currentPeer = fromUser; currentCallId = callId; isCaller = false;
+            openCallWindow(fromUser, callId, VideoCallController.Mode.INCOMING);
+        });
+    }
+
+    @Override public void onAccept(String fromUser, String callId) {
+        Platform.runLater(() -> {
+            if (isCaller && callCtrl != null
+                && fromUser.equals(currentPeer) && callId.equals(currentCallId)) {
+                callCtrl.setMode(VideoCallController.Mode.CONNECTING);
+            }
+        });
+    }
+
+    @Override public void onReject(String fromUser, String callId) { Platform.runLater(this::closeCallWindow); }
+    @Override public void onCancel(String fromUser, String callId) { Platform.runLater(this::closeCallWindow); }
+    @Override public void onBusy  (String fromUser, String callId) { Platform.runLater(this::closeCallWindow); }
+    @Override public void onEnd   (String fromUser, String callId) { Platform.runLater(this::closeCallWindow); }
+
+    @Override public void onOffline(String toUser, String callId) {
+        // Người nhận offline -> không mở cửa sổ; có thể show toast nếu muốn
+    }
+
+    // GĐ4 media sẽ xử lý 3 cái dưới; hiện tại chỉ log:
+    @Override public void onOffer (String from, String id, String sdp) { System.out.println("[CALL] OFFER len=" + sdp.length()); }
+    @Override public void onAnswer(String from, String id, String sdp){ System.out.println("[CALL] ANSWER len=" + sdp.length()); }
+    @Override public void onIce   (String from, String id, String c)  { System.out.println("[CALL] ICE len=" + c.length()); }
+
+    private void openCallWindow(String peer, String callId, VideoCallController.Mode mode) {
+        try {
+            // đóng phiên cũ nếu còn
+            if (callStage != null) { callStage.close(); callStage = null; }
+
+            FXMLLoader fx = new FXMLLoader(getClass().getResource("/client/view/VideoCallOverlay.fxml"));
+            Parent root = fx.load();
+            callCtrl = fx.getController();
+            callCtrl.init(callSvc, peer, callId, mode, this::closeCallWindow);
+
+            callStage = new Stage(StageStyle.UTILITY); // có khung nhỏ gọn; dùng UNDECORATED nếu muốn phẳng.
+            callStage.setTitle("Call • @" + peer);
+            callStage.initModality(Modality.NONE);     // không khoá cửa sổ chat
+            callStage.setResizable(false);
+            Scene scene = new Scene(root);
+            scene.getStylesheets().add(getClass().getResource("/client/view/chat.css").toExternalForm());
+            callStage.setScene(scene);
+            callStage.setAlwaysOnTop(true);
+            callStage.show();
+            callStage.requestFocus();
+
+            // Người dùng bấm nút [X] của cửa sổ → gửi END
+            callStage.setOnCloseRequest(ev -> {
+                if (currentCallId != null && currentPeer != null) {
+                    callSvc.sendEnd(currentPeer, currentCallId);
+                }
+                resetCallState();
+            });
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void closeCallWindow() {
+        if (callStage != null) {
+            callStage.close();
+            callStage = null;
+        }
+        resetCallState();
+    }
+
+    private void resetCallState() {
+        callCtrl = null;
+        currentCallId = null;
+        currentPeer = null;
+        isCaller = false;
+    }
+    
+    public void showCallWindow() { if (callStage != null) { callStage.show(); callStage.toFront(); } }
+    public void hideCallWindow() { if (callStage != null) callStage.hide(); }
+
 }

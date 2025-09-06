@@ -1,5 +1,6 @@
 package client.controller;
 
+import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
@@ -15,6 +16,7 @@ import java.util.Optional;
 
 import client.ClientConnection;
 import client.model.User;
+import client.signaling.CallSignalingService;
 
 public class MainController {
 
@@ -107,34 +109,48 @@ public class MainController {
 
     private void goToHome(User loggedInUser) {
         try {
-            // 1) Tạo kết nối duy nhất ở đây
+            // 1) Tạo kết nối duy nhất
             ClientConnection conn = new ClientConnection();
             boolean ok = conn.connect("127.0.0.1", 5000);
             if (!ok) {
                 new Alert(Alert.AlertType.ERROR, "Không kết nối được server.").showAndWait();
                 return;
             }
-            // 2) Gửi LOGIN ngay sau khi connect
+
+            // 2) LOGIN ngay sau khi connect
             conn.login(loggedInUser.getUsername());
 
-            // 3) Load Home.fxml 1 lần duy nhất bằng FXMLLoader (để lấy controller)
+            // 3) Bootstrap signaling (QUAN TRỌNG: làm TRƯỚC khi startListener)
+            CallSignalingService callSvc = new CallSignalingService(conn);
+            // Nếu constructor của bạn KHÔNG tự attach thì nhớ:
+            // conn.attachCallService(callSvc);
+
+            // 4) Load Home.fxml
             Stage stage = (Stage) loginBtn.getScene().getWindow();
             FXMLLoader loader = new FXMLLoader(getClass().getResource("/client/view/Home.fxml"));
             Parent root = loader.load();
 
-            // 4) Truyền user + connection sang HomeController
+            // 5) Truyền user + connection + signaling xuống HomeController
             HomeController home = loader.getController();
             home.setCurrentUser(loggedInUser);
-            home.setConnection(conn);   // <-- rất quan trọng: không tạo kết nối mới trong HomeController
+            home.setConnection(conn);          // KHÔNG tạo kết nối mới trong HomeController
+            home.setCallService(callSvc);      // <-- thêm setter này trong HomeController
             home.reloadAll();
 
-            // 5) Chuyển scene
+            // 6) Bắt đầu nghe server (CALL_* sẽ bị chặn trong ClientConnection nhờ callSvc)
+            // Nếu bạn đã startListener bên trong HomeController.setConnection(...) thì bỏ đoạn này.
+            conn.startListener(
+                line -> Platform.runLater(() -> home.onServerLine(line)),   // xử lý các dòng KHÔNG phải CALL_*
+                err  -> Platform.runLater(() -> home.onConnectionError(err))
+            );
+
+            // 7) Chuyển scene
             Scene scene = new Scene(root);
             scene.getStylesheets().add(getClass().getResource("/client/view/chat.css").toExternalForm());
             stage.setScene(scene);
             stage.centerOnScreen();
 
-            // 6) Khi đóng cửa sổ, thoát sạch: set offline + QUIT + close
+            // 8) Đóng cửa sổ: set offline + QUIT + close
             stage.setOnCloseRequest(ev -> {
                 try { UserDAO.setOnline(loggedInUser.getId(), false); } catch (Exception ignore) {}
                 try { conn.send("QUIT"); } catch (Exception ignore) {}
@@ -146,6 +162,4 @@ public class MainController {
             new Alert(Alert.AlertType.ERROR, "Không thể mở giao diện Home:\n" + e.getMessage()).showAndWait();
         }
     }
-
-
 }

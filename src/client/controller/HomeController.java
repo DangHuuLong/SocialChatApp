@@ -3,6 +3,7 @@ package client.controller;
 
 import client.ClientConnection;
 import client.model.User;
+import client.signaling.CallSignalingService;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
@@ -18,13 +19,11 @@ import server.dao.UserDAO;
 import java.sql.SQLException;
 
 public class HomeController {
-
-    // ========= FXML nodes được inject trực tiếp từ Home.fxml =========
     // Left panel
     @FXML private VBox chatList;
     @FXML private TextField searchField;
 
-    // Mid panel (header + message area + input)
+    // Mid panel 
     @FXML private Label currentChatName;
     @FXML private Label currentChatStatus;
     @FXML private VBox messageContainer;
@@ -44,25 +43,21 @@ public class HomeController {
     @FXML private VBox rightEmpty;
 
 
-    // ========= Controllers con sau khi tách =========
     private final LeftController leftCtrl  = new LeftController();
     private final MidController  midCtrl   = new MidController();
     private final RightController rightCtrl = new RightController();
 
-    // ========= State chung =========
     private User currentUser;
     private ClientConnection connection;
+    private CallSignalingService callSvc;
 
-    // ========= Lifecycle =========
     @FXML
     private void initialize() {
-        // Bind các node cho từng controller con
         leftCtrl.bind(chatList, searchField);
         rightCtrl.bind(infoName, chatStatus);
         midCtrl.bind(currentChatName, currentChatStatus, messageContainer, messageField, logoutBtn);
         midCtrl.setRightController(rightCtrl);
 
-        // Khi click 1 đoạn chat ở panel trái -> mở hội thoại ở giữa & cập nhật panel phải
         leftCtrl.setOnOpenConversation(user -> {
             toggleCenterEmpty(false);
             toggleRightEmpty(false);
@@ -71,6 +66,7 @@ public class HomeController {
         
         toggleCenterEmpty(true);
         toggleRightEmpty(true);
+        
     }
     
     private void toggleCenterEmpty(boolean showEmpty) {
@@ -86,6 +82,19 @@ public class HomeController {
         rightContent.setManaged(!showEmpty);
     }
 
+    public void setCallService(CallSignalingService svc) {
+        this.callSvc = svc;
+        this.callSvc.setListener(midCtrl);
+
+        midCtrl.setCallService(this.callSvc);
+    }
+
+    public void onServerLine(String line) {
+        // xử lý các message KHÔNG phải CALL_* (MSG/DM/WHO/HISTORY...) như bạn đang làm
+    }
+    public void onConnectionError(Exception e) {
+        // báo lỗi, show dialog, v.v.
+    }
 
     // ========= Wiring từ màn trước (MainController) =========
     public void setCurrentUser(User user) {
@@ -99,7 +108,6 @@ public class HomeController {
         midCtrl.setConnection(conn);
     }
 
-    /** Gọi hàm này sau khi setCurrentUser/ setConnection để load danh sách user và start polling presence */
     public void reloadAll() {
         leftCtrl.reloadAll();
     }
@@ -111,17 +119,14 @@ public class HomeController {
     // ========= Handler được gọi từ FXML: onAction="#onLogout" =========
     @FXML
     private void onLogout() {
-        // 1) Cập nhật trạng thái offline trong DB
         try {
             if (currentUser != null) {
                 UserDAO.setOnline(currentUser.getId(), false);
             }
         } catch (SQLException ignored) {}
 
-        // 2) Dừng polling presence (nếu đang chạy)
         leftCtrl.stopPolling();
 
-        // 3) Đóng kết nối tới server
         if (connection != null) {
             try {
                 connection.send("QUIT");
@@ -131,7 +136,6 @@ public class HomeController {
         }
         currentUser = null;
 
-        // 4) Quay về màn hình đăng nhập (Main.fxml)
         try {
             Stage stage = (Stage) logoutBtn.getScene().getWindow();
             FXMLLoader loader = new FXMLLoader(getClass().getResource("/client/view/Main.fxml"));

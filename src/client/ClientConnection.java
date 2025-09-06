@@ -5,11 +5,14 @@ import java.io.*;
 import java.net.*;
 import java.util.function.Consumer;
 
+import client.signaling.CallSignalingService;
+
 public class ClientConnection {
     private Socket socket;
     private BufferedReader in;
     private PrintWriter out;
     private Thread readerThread;
+    private CallSignalingService callService;
 
     private Consumer<String> onMessage;
     private Consumer<Exception> onError;
@@ -26,6 +29,15 @@ public class ClientConnection {
             return false;
         }
     }
+    
+    public void attachCallService(CallSignalingService s) {
+        this.callService = s;
+    }
+    
+    public synchronized void sendRaw(String line) {
+        out.println(line);
+        out.flush();
+    }
 
     public void startListener(Consumer<String> onMessage, Consumer<Exception> onError) {
         this.onMessage = onMessage;
@@ -35,6 +47,13 @@ public class ClientConnection {
             try {
                 String line;
                 while ((line = in.readLine()) != null) {
+                	if (line.isEmpty()) continue;
+
+                    if (callService != null && line.startsWith("CALL_")) {
+                        if (callService.parseIncoming(line)) {
+                            continue; 
+                        }
+                    }
                     if (onMessage != null) onMessage.accept(line);
                 }
                 if (onError != null) onError.accept(new EOFException("Server closed connection"));

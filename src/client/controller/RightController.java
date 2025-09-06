@@ -6,11 +6,9 @@ import javafx.scene.control.Label;
 import java.time.Instant;
 
 public class RightController {
-    // FXML nodes (bind từ HomeController)
     private Label infoName;
     private Label chatStatus;
 
-    // ===== Wiring từ HomeController =====
     public void bind(Label infoName, Label chatStatus) {
         this.infoName = infoName;
         this.chatStatus = chatStatus;

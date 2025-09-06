@@ -72,7 +72,6 @@ public class MessageDao {
         }
     }
 
-    // Lấy hội thoại 2 chiều giữa a và b (mới nhất trước, rồi đảo lại cho đúng thứ tự)
     public List<HistoryRow> loadConversation(String a, String b, int limit) throws SQLException {
         String sql = """
             SELECT sender, recipient, body, created_at

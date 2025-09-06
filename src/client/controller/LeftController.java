@@ -20,11 +20,9 @@ import java.util.Map;
 import java.util.function.Consumer;
 
 public class LeftController {
-    // FXML nodes (được bind từ HomeController)
     private VBox chatList;
     private TextField searchField;
 
-    // State riêng của panel left
     private final Map<Integer, Label> lastLabels = new HashMap<>();
     private final Map<Integer, User> idToUser = new HashMap<>();
     private Timeline poller;
@@ -32,10 +30,8 @@ public class LeftController {
     // User hiện tại
     private User currentUser;
 
-    // callback khi click 1 đoạn chat
     private Consumer<User> onOpenConversation;
 
-    // ===== Wiring từ HomeController =====
     public void bind(VBox chatList, TextField searchField) {
         this.chatList = chatList;
         this.searchField = searchField;
