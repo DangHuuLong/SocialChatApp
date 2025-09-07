@@ -1,6 +1,8 @@
 package client.controller;
 
 import client.ClientConnection;
+import client.media.CallOffer;
+import client.media.LanAudioSession;
 import client.media.LanVideoSession;
 import client.media.LanVideoSession.OfferInfo;
 import client.signaling.CallSignalListener;
@@ -48,6 +50,7 @@ public class MidController implements CallSignalListener {
     private User currentPeerUser;
     
     private LanVideoSession videoSession;
+    private LanAudioSession audioSession;   
 
     public void bind(Label currentChatName, Label currentChatStatus,
                      VBox messageContainer, TextField messageField, Button logoutBtn) {
@@ -367,30 +370,30 @@ public class MidController implements CallSignalListener {
             if (isCaller && callCtrl != null
                 && fromUser.equals(currentPeer) && callId.equals(currentCallId)) {
                 // 1) Caller chuẩn bị socket và gửi OFFER {host, port}
-                try {
-                    videoSession = new LanVideoSession();
-                    OfferInfo offer = videoSession.prepareCaller();
-                    // Gửi OFFER (JSON base64 được CallSignalingService đảm nhiệm)
-                    callSvc.sendOffer(currentPeer, currentCallId, offer.toJson());
+            	try {
+            	    videoSession = new LanVideoSession();
+            	    OfferInfo v = videoSession.prepareCaller();
 
-                    // 2) Bắt đầu chờ Callee kết nối, sẽ start stream sau khi accept()
-                    videoSession.startAsCaller(
-                            callCtrl.getLocalView(),
-                            callCtrl.getRemoteView()
-                    );
+            	    audioSession = new LanAudioSession();
+            	    int aport = audioSession.prepareCaller(v.host);
 
-                    // 3) UI giữ CONNECTING cho tới khi bên kia connect xong
-                    callCtrl.setMode(VideoCallController.Mode.CONNECTING);
-                    
-                    System.out.println("[CALL] onAccept from=" + fromUser + " id=" + callId);
-                    System.out.println("[MEDIA] prepareCaller -> " + offer.host + ":" + offer.port);
+            	    // gửi OFFER gộp (host + vport + aport)
+            	    CallOffer offer = new CallOffer(v.host, v.port, aport);
+            	    callSvc.sendOffer(currentPeer, currentCallId, offer.toJson());
 
-                } catch (Exception e) {
-                    e.printStackTrace();
-                    // nếu lỗi, kết thúc cuộc gọi
-                    callSvc.sendEnd(currentPeer, currentCallId);
-                    closeCallWindow();
-                }
+            	    // chờ kết nối từ callee
+            	    videoSession.startAsCaller(callCtrl.getLocalView(), callCtrl.getRemoteView());
+            	    audioSession.startAsCaller();
+
+            	    callCtrl.setMode(VideoCallController.Mode.CONNECTING);
+            	    System.out.println("[CALL] onAccept from=" + fromUser + " id=" + callId);
+            	    System.out.println("[MEDIA] vport=" + v.port + ", aport=" + aport);
+            	} catch (Exception e) {
+            	    e.printStackTrace();
+            	    callSvc.sendEnd(currentPeer, currentCallId);
+            	    closeCallWindow();
+            	}
+
             }
         });
     }
@@ -405,29 +408,29 @@ public class MidController implements CallSignalListener {
     }
 
     // ===== Callee nhận OFFER {host, port} =====
-    @Override public void onOffer(String fromUser, String callId, String sdpJson) {
+    @Override
+    public void onOffer(String fromUser, String callId, String sdpJson) {
         Platform.runLater(() -> {
             try {
                 if (!fromUser.equals(currentPeer) || !callId.equals(currentCallId)) return;
-                // parse host/port
-                OfferInfo offer = OfferInfo.fromJson(sdpJson);
 
-                // tạo session và kết nối tới caller
+                // Parse payload gộp
+                CallOffer offer = CallOffer.fromJson(sdpJson);
+
+                // Kết nối VIDEO
                 videoSession = new LanVideoSession();
                 videoSession.startAsCallee(
-                        offer.host, offer.port,
-                        callCtrl.getLocalView(), callCtrl.getRemoteView()
+                    offer.host, offer.vport,
+                    callCtrl.getLocalView(), callCtrl.getRemoteView()
                 );
 
-                // trả lời OK (trong LAN mình chỉ trả flag đơn giản)
+                // Kết nối AUDIO
+                audioSession = new LanAudioSession();
+                audioSession.startAsCallee(offer.host, offer.aport);
+
+                // Trả lời OK & mở UI
                 callSvc.sendAnswer(currentPeer, currentCallId, "{\"ok\":true}");
-
-                // chuyển sang CONNECTED để mở video box
                 callCtrl.setMode(VideoCallController.Mode.CONNECTED);
-
-                System.out.println("[CALL] onOffer from=" + fromUser + " id=" + callId + " json=" + sdpJson);
-                System.out.println("[MEDIA] startAsCallee connecting to " + offer.host + ":" + offer.port);
-
             } catch (Exception e) {
                 e.printStackTrace();
                 callSvc.sendEnd(currentPeer, currentCallId);
@@ -435,6 +438,7 @@ public class MidController implements CallSignalListener {
             }
         });
     }
+
     
     // ===== Caller nhận ANSWER – chỉ dùng để chuyển UI sang CONNECTED (tuỳ bạn) =====
     @Override public void onAnswer(String fromUser, String callId, String sdpJson) {
@@ -487,11 +491,13 @@ public class MidController implements CallSignalListener {
     
     private void endAndClose() {
         if (videoSession != null) { videoSession.stop(); videoSession = null; }
+        if (audioSession != null) { audioSession.stop(); audioSession = null; }
         closeCallWindow();
     }
 
     private void closeCallWindow() {
         if (videoSession != null) { videoSession.stop(); videoSession = null; }
+        if (audioSession != null) { audioSession.stop(); audioSession = null; }
         if (callStage != null) { callStage.close(); callStage = null; }
         resetCallState();
     }
