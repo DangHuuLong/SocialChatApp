@@ -5,10 +5,11 @@ import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
+import javafx.scene.image.ImageView;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
+import javafx.stage.Stage;
 
-/** Cửa sổ gọi gọn – chưa gắn media (GĐ4). */
 public class VideoCallController {
 
     public enum Mode { INCOMING, OUTGOING, CONNECTING, CONNECTED }
@@ -18,7 +19,10 @@ public class VideoCallController {
     @FXML private Label avatarLabel;
 
     @FXML private HBox incomingBtns, outgoingBtns, connectedBtns;
-    @FXML private StackPane videoBox; // ẩn khi chưa CONNECTED
+
+    @FXML private StackPane videoStack;      // container video
+    @FXML private ImageView remoteVideo;     // KHUNG LỚN (đối phương)
+    @FXML private ImageView localPreview;    // PIP (của mình)
 
     @FXML private Button acceptBtn, rejectBtn, cancelBtn, hangupBtn;
 
@@ -26,7 +30,7 @@ public class VideoCallController {
     private String peer;
     private String callId;
     private Mode mode = Mode.INCOMING;
-    private Runnable onCloseWindow; // MidController truyền vào để đóng cửa sổ khi END
+    private Runnable onCloseWindow; // MidController cung cấp
 
     public void init(CallSignalingService svc, String peer, String callId,
                      Mode initialMode, Runnable onCloseWindow) {
@@ -36,9 +40,20 @@ public class VideoCallController {
         this.onCloseWindow = onCloseWindow;
 
         peerLabel.setText("@" + peer);
-        String initials = peer == null || peer.isEmpty()
-                ? "?" : ("" + Character.toUpperCase(peer.charAt(0)));
+        String initials = (peer == null || peer.isEmpty())
+                ? "?" : String.valueOf(Character.toUpperCase(peer.charAt(0)));
         avatarLabel.setText(initials);
+
+        // Bind kích thước khung lớn theo container
+        remoteVideo.setPreserveRatio(true);
+        remoteVideo.setSmooth(true);
+        remoteVideo.fitWidthProperty().bind(videoStack.widthProperty());
+        remoteVideo.fitHeightProperty().bind(videoStack.heightProperty());
+
+        // PIP cố định
+        localPreview.setPreserveRatio(true);
+        localPreview.setSmooth(true);
+        localPreview.setFitWidth(240);
 
         setMode(initialMode);
         wireButtons();
@@ -59,15 +74,12 @@ public class VideoCallController {
         setGroupVisible(connectedBtns, m == Mode.CONNECTED);
 
         boolean showVideo = (m == Mode.CONNECTED);
-        if (videoBox != null) {
-            videoBox.setVisible(showVideo);
-            videoBox.setManaged(showVideo);
-        }
+        videoStack.setVisible(showVideo);
+        videoStack.setManaged(showVideo);
 
-        // co/giãn cửa sổ theo mode
         Platform.runLater(() -> {
             var scene = statusLabel.getScene();
-            if (scene != null && scene.getWindow() instanceof javafx.stage.Stage stage) {
+            if (scene != null && scene.getWindow() instanceof Stage stage) {
                 if (showVideo) {
                     stage.setResizable(true);
                     stage.setMinWidth(940);
@@ -88,14 +100,21 @@ public class VideoCallController {
     }
 
     private void wireButtons() {
-        if (acceptBtn != null) acceptBtn.setOnAction(e -> callSvc.sendAccept(peer, callId));
+        if (acceptBtn != null) acceptBtn.setOnAction(e -> {
+            callSvc.sendAccept(peer, callId);
+            setMode(Mode.CONNECTING);
+        });
         if (rejectBtn != null) rejectBtn.setOnAction(e -> { callSvc.sendReject(peer, callId); safeClose(); });
         if (cancelBtn != null) cancelBtn.setOnAction(e -> { callSvc.sendCancel(peer, callId); safeClose(); });
         if (hangupBtn != null) hangupBtn.setOnAction(e -> { callSvc.sendEnd(peer, callId); safeClose(); });
     }
 
-    /** MidController sẽ thực hiện đóng Stage thật. */
+    /** MidController sẽ đóng Stage thật khi END. */
     public void safeClose() {
         if (onCloseWindow != null) Platform.runLater(onCloseWindow);
     }
+
+    // === Getters để LanVideoSession set hình ===
+    public ImageView getRemoteView() { return remoteVideo; }
+    public ImageView getLocalView()  { return localPreview; }
 }

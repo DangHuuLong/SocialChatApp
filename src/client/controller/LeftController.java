@@ -1,6 +1,5 @@
 package client.controller;
 
-import client.model.User;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
 import javafx.application.Platform;
@@ -18,6 +17,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
+
+import common.User;
 
 public class LeftController {
     private VBox chatList;

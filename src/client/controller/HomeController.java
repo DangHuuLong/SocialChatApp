@@ -2,8 +2,8 @@
 package client.controller;
 
 import client.ClientConnection;
-import client.model.User;
 import client.signaling.CallSignalingService;
+import common.User;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
@@ -41,6 +41,9 @@ public class HomeController {
     @FXML private StackPane rightStack;
     @FXML private VBox rightContent;
     @FXML private VBox rightEmpty;
+    
+    @FXML private Button callBtn;
+    @FXML private Button videoBtn;
 
 
     private final LeftController leftCtrl  = new LeftController();
@@ -146,6 +149,14 @@ public class HomeController {
             stage.centerOnScreen();
         } catch (Exception e) {
             e.printStackTrace();
+        }
+    }
+    
+    @FXML
+    private void onCall() {
+        // gọi người đang mở ở giữa
+        if (midCtrl != null) {
+            midCtrl.callCurrentPeer();
         }
     }
 }

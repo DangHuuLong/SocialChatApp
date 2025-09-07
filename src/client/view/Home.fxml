@@ -56,14 +56,14 @@
                         </VBox>
                         <Region HBox.hgrow="ALWAYS"/>
                         <HBox spacing="8">
-                            <children>
-                                <Button text="Gọi" styleClass="action-btn"/>
-                                <Button text="Video" styleClass="action-btn"/>
-                                <Button text="⋯" styleClass="action-btn"/>
-                                <Button fx:id="logoutBtn" text="🚪 Logout" onAction="#onLogout"
-                                        style="-fx-background-color: #EF4444; -fx-text-fill: white; -fx-background-radius: 8; -fx-padding: 6 14;"/>
-                            </children>
-                        </HBox>
+						  <children>
+						    <Button fx:id="callBtn"  text="Gọi"   styleClass="action-btn" onAction="#onCall"/>
+						    <Button fx:id="videoBtn" text="Video" styleClass="action-btn" onAction="#onCall"/>
+						    <Button text="⋯" styleClass="action-btn"/>
+						    <Button fx:id="logoutBtn" text="🚪 Logout" onAction="#onLogout"
+						            style="-fx-background-color: #EF4444; -fx-text-fill: white; -fx-background-radius: 8; -fx-padding: 6 14;"/>
+						  </children>
+						</HBox>
                     </children>
                     <padding><Insets top="10" right="12" bottom="10" left="12"/></padding>
                 </HBox>

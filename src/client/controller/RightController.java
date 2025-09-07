@@ -1,9 +1,10 @@
 package client.controller;
 
-import client.model.User;
 import javafx.scene.control.Label;
 
 import java.time.Instant;
+
+import common.User;
 
 public class RightController {
     private Label infoName;

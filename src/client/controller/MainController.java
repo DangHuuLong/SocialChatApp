@@ -15,8 +15,8 @@ import java.sql.SQLException;
 import java.util.Optional;
 
 import client.ClientConnection;
-import client.model.User;
 import client.signaling.CallSignalingService;
+import common.User;
 
 public class MainController {
 

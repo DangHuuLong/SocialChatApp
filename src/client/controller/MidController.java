@@ -1,9 +1,11 @@
 package client.controller;
 
 import client.ClientConnection;
-import client.model.User;
+import client.media.LanVideoSession;
+import client.media.LanVideoSession.OfferInfo;
 import client.signaling.CallSignalListener;
 import client.signaling.CallSignalingService;
+import common.User;
 import javafx.application.Platform;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Node;
@@ -43,6 +45,9 @@ public class MidController implements CallSignalListener {
     private User currentUser;
     private User selectedUser;
     private ClientConnection connection;
+    private User currentPeerUser;
+    
+    private LanVideoSession videoSession;
 
     public void bind(Label currentChatName, Label currentChatStatus,
                      VBox messageContainer, TextField messageField, Button logoutBtn) {
@@ -100,6 +105,7 @@ public class MidController implements CallSignalListener {
         if (connection != null && connection.isAlive()) {
             connection.send("HISTORY " + u.getUsername() + " 50");
         }
+        this.currentPeerUser = u;
     }
 
     // ===== Messaging =====
@@ -320,6 +326,15 @@ public class MidController implements CallSignalListener {
         }
     }
     
+    // Call
+    public void callCurrentPeer() {
+        if (currentPeerUser == null) {
+            System.out.println("[CALL] No peer selected");
+            return;
+        }
+        startCallTo(currentPeerUser);  
+    }
+    
     public void setCallService(CallSignalingService svc) {
         this.callSvc = svc;
     }
@@ -330,7 +345,7 @@ public class MidController implements CallSignalListener {
     }
 
     /** (Tuỳ chọn) Gọi từ UI khi bạn muốn chủ động gọi đi */
-    public void startCallTo(client.model.User peerUser) {
+    public void startCallTo(common.User peerUser) {
         String peer = peerUser.getUsername();
         String callId = java.util.UUID.randomUUID().toString();
         currentPeer = peer; currentCallId = callId; isCaller = true;
@@ -351,7 +366,31 @@ public class MidController implements CallSignalListener {
         Platform.runLater(() -> {
             if (isCaller && callCtrl != null
                 && fromUser.equals(currentPeer) && callId.equals(currentCallId)) {
-                callCtrl.setMode(VideoCallController.Mode.CONNECTING);
+                // 1) Caller chuẩn bị socket và gửi OFFER {host, port}
+                try {
+                    videoSession = new LanVideoSession();
+                    OfferInfo offer = videoSession.prepareCaller();
+                    // Gửi OFFER (JSON base64 được CallSignalingService đảm nhiệm)
+                    callSvc.sendOffer(currentPeer, currentCallId, offer.toJson());
+
+                    // 2) Bắt đầu chờ Callee kết nối, sẽ start stream sau khi accept()
+                    videoSession.startAsCaller(
+                            callCtrl.getLocalView(),
+                            callCtrl.getRemoteView()
+                    );
+
+                    // 3) UI giữ CONNECTING cho tới khi bên kia connect xong
+                    callCtrl.setMode(VideoCallController.Mode.CONNECTING);
+                    
+                    System.out.println("[CALL] onAccept from=" + fromUser + " id=" + callId);
+                    System.out.println("[MEDIA] prepareCaller -> " + offer.host + ":" + offer.port);
+
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    // nếu lỗi, kết thúc cuộc gọi
+                    callSvc.sendEnd(currentPeer, currentCallId);
+                    closeCallWindow();
+                }
             }
         });
     }
@@ -365,9 +404,49 @@ public class MidController implements CallSignalListener {
         // Người nhận offline -> không mở cửa sổ; có thể show toast nếu muốn
     }
 
-    // GĐ4 media sẽ xử lý 3 cái dưới; hiện tại chỉ log:
-    @Override public void onOffer (String from, String id, String sdp) { System.out.println("[CALL] OFFER len=" + sdp.length()); }
-    @Override public void onAnswer(String from, String id, String sdp){ System.out.println("[CALL] ANSWER len=" + sdp.length()); }
+    // ===== Callee nhận OFFER {host, port} =====
+    @Override public void onOffer(String fromUser, String callId, String sdpJson) {
+        Platform.runLater(() -> {
+            try {
+                if (!fromUser.equals(currentPeer) || !callId.equals(currentCallId)) return;
+                // parse host/port
+                OfferInfo offer = OfferInfo.fromJson(sdpJson);
+
+                // tạo session và kết nối tới caller
+                videoSession = new LanVideoSession();
+                videoSession.startAsCallee(
+                        offer.host, offer.port,
+                        callCtrl.getLocalView(), callCtrl.getRemoteView()
+                );
+
+                // trả lời OK (trong LAN mình chỉ trả flag đơn giản)
+                callSvc.sendAnswer(currentPeer, currentCallId, "{\"ok\":true}");
+
+                // chuyển sang CONNECTED để mở video box
+                callCtrl.setMode(VideoCallController.Mode.CONNECTED);
+
+                System.out.println("[CALL] onOffer from=" + fromUser + " id=" + callId + " json=" + sdpJson);
+                System.out.println("[MEDIA] startAsCallee connecting to " + offer.host + ":" + offer.port);
+
+            } catch (Exception e) {
+                e.printStackTrace();
+                callSvc.sendEnd(currentPeer, currentCallId);
+                closeCallWindow();
+            }
+        });
+    }
+    
+    // ===== Caller nhận ANSWER – chỉ dùng để chuyển UI sang CONNECTED (tuỳ bạn) =====
+    @Override public void onAnswer(String fromUser, String callId, String sdpJson) {
+        Platform.runLater(() -> {
+            if (isCaller && callCtrl != null
+                && fromUser.equals(currentPeer) && callId.equals(currentCallId)) {
+                callCtrl.setMode(VideoCallController.Mode.CONNECTED);
+                
+                System.out.println("[CALL] onAnswer ok -> set CONNECTED");
+            }
+        });
+    }
     @Override public void onIce   (String from, String id, String c)  { System.out.println("[CALL] ICE len=" + c.length()); }
 
     private void openCallWindow(String peer, String callId, VideoCallController.Mode mode) {
@@ -380,34 +459,40 @@ public class MidController implements CallSignalListener {
             callCtrl = fx.getController();
             callCtrl.init(callSvc, peer, callId, mode, this::closeCallWindow);
 
-            callStage = new Stage(StageStyle.UTILITY); // có khung nhỏ gọn; dùng UNDECORATED nếu muốn phẳng.
+            callStage = new Stage(/* mặc định DECORATED */);
             callStage.setTitle("Call • @" + peer);
-            callStage.initModality(Modality.NONE);     // không khoá cửa sổ chat
-            callStage.setResizable(false);
+            callStage.initModality(Modality.NONE);   // không khoá UI chat
+            callStage.setResizable(true);
             Scene scene = new Scene(root);
             scene.getStylesheets().add(getClass().getResource("/client/view/chat.css").toExternalForm());
             callStage.setScene(scene);
-            callStage.setAlwaysOnTop(true);
+            callStage.setAlwaysOnTop(false);         // tuỳ ý
             callStage.show();
             callStage.requestFocus();
 
-            // Người dùng bấm nút [X] của cửa sổ → gửi END
+            // Bấm nút [X] -> CHỈ THU NHỎ, KHÔNG END
             callStage.setOnCloseRequest(ev -> {
-                if (currentCallId != null && currentPeer != null) {
-                    callSvc.sendEnd(currentPeer, currentCallId);
-                }
-                resetCallState();
+                ev.consume();
+                callStage.setIconified(true);
             });
+
+            // Nếu bạn muốn có nút "Hang Up" trong UI để thật sự END:
+            // đã được wire trong VideoCallController (gọi callSvc.sendEnd(...) và safeClose()).
+
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
+    
+    private void endAndClose() {
+        if (videoSession != null) { videoSession.stop(); videoSession = null; }
+        closeCallWindow();
+    }
+
     private void closeCallWindow() {
-        if (callStage != null) {
-            callStage.close();
-            callStage = null;
-        }
+        if (videoSession != null) { videoSession.stop(); videoSession = null; }
+        if (callStage != null) { callStage.close(); callStage = null; }
         resetCallState();
     }
 

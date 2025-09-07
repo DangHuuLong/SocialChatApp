@@ -5,7 +5,7 @@ import java.time.Instant;
 import java.util.*;
 
 import org.mindrot.jbcrypt.BCrypt;
-import client.model.*;
+import common.User;
 
 public class UserDAO {
 

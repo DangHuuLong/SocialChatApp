@@ -11,5 +11,9 @@
 	<classpathentry kind="lib" path="D:/mysql-connector-j-9.3.0/mysql-connector-j-9.3.0.jar"/>
 	<classpathentry kind="lib" path="D:/java-2024-09/worksplace/jbcrypt-0.4.jar"/>
 	<classpathentry kind="lib" path="D:/java-2024-09/worksplace/json-20240303.jar"/>
+	<classpathentry kind="lib" path="D:/java-2024-09/worksplace/webcam-capture-0.3.12.jar"/>
+	<classpathentry kind="lib" path="D:/java-2024-09/worksplace/slf4j-api-1.7.36.jar"/>
+	<classpathentry kind="lib" path="D:/java-2024-09/worksplace/slf4j-simple-1.7.36.jar"/>
+	<classpathentry kind="lib" path="D:/java-2024-09/worksplace/bridj-0.7.0.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>
