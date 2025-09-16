@@ -62,6 +62,7 @@ public class LeftController {
             idToUser.put(u.getId(), u);
             chatList.getChildren().add(createChatItem(u));
         }
+        System.out.println("[LEFT] renderUsers size=" + users.size());
     }
     
     public void reloadAll() {
@@ -119,12 +120,14 @@ public class LeftController {
         row.getChildren().addAll(avatar, textBox);
 
         row.setOnMouseClicked(ev -> {
+        	System.out.println("[CLICK] row clicked for " + u.getUsername());
             Integer uid = (Integer) row.getUserData();
             if (uid != null && onOpenConversation != null) {
                 User target = idToUser.get(uid);
                 if (target != null) onOpenConversation.accept(target);
             }
         });
+        System.out.println("[LEFT] createChatItem " + u.getUsername());
         return row;
     }
 

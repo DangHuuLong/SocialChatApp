@@ -56,14 +56,14 @@
                         </VBox>
                         <Region HBox.hgrow="ALWAYS"/>
                         <HBox spacing="8">
-						  <children>
-						    <Button fx:id="callBtn"  text="Gọi"   styleClass="action-btn" onAction="#onCall"/>
-						    <Button fx:id="videoBtn" text="Video" styleClass="action-btn" onAction="#onCall"/>
-						    <Button text="⋯" styleClass="action-btn"/>
-						    <Button fx:id="logoutBtn" text="🚪 Logout" onAction="#onLogout"
-						            style="-fx-background-color: #EF4444; -fx-text-fill: white; -fx-background-radius: 8; -fx-padding: 6 14;"/>
-						  </children>
-						</HBox>
+                            <children>
+                                <Button fx:id="callBtn"  text="Gọi"   styleClass="action-btn" onAction="#onCall"/>
+                                <Button fx:id="videoBtn" text="Video" styleClass="action-btn" onAction="#onCall"/>
+                                <Button text="⋯" styleClass="action-btn"/>
+                                <Button fx:id="logoutBtn" text="🚪 Logout" onAction="#onLogout"
+                                        style="-fx-background-color: #EF4444; -fx-text-fill: white; -fx-background-radius: 8; -fx-padding: 6 14;"/>
+                            </children>
+                        </HBox>
                     </children>
                     <padding><Insets top="10" right="12" bottom="10" left="12"/></padding>
                 </HBox>
@@ -80,10 +80,11 @@
                 <!-- Input bar -->
                 <HBox spacing="8" styleClass="input-bar" alignment="CENTER_LEFT">
                     <children>
-                        <Button text="🎤" styleClass="icon-btn"/>
-                        <Button text="📎" styleClass="icon-btn"/>
+                        <!-- GẮN SỰ KIỆN MỚI: voice / attach / send -->
+                        <Button fx:id="micBtn"    text="🎤" styleClass="icon-btn" onAction="#onVoice"/>
+                        <Button fx:id="attachBtn" text="📎" styleClass="icon-btn" onAction="#onAttach"/>
                         <TextField fx:id="messageField" promptText="Nhập tin nhắn..." HBox.hgrow="ALWAYS"/>
-                        <Button text="Gửi" styleClass="send-btn"/>
+                        <Button fx:id="sendBtn" text="Gửi" styleClass="send-btn" onAction="#onSend"/>
                     </children>
                     <padding><Insets top="10" right="12" bottom="10" left="12"/></padding>
                 </HBox>

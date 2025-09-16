@@ -1,6 +1,6 @@
+// client/controller/MainController.java
 package client.controller;
 
-import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
@@ -11,7 +11,7 @@ import javafx.stage.Stage;
 import server.dao.UserDAO;
 import javafx.geometry.Insets;
 
-import java.sql.SQLException;           
+import java.sql.SQLException;
 import java.util.Optional;
 
 import client.ClientConnection;
@@ -23,7 +23,7 @@ public class MainController {
     @FXML private Button loginBtn;
     @FXML private Button registerBtn;
 
-    private final UserDAO userDAO = new UserDAO(); 
+    private final UserDAO userDAO = new UserDAO();
 
     @FXML private void onLogin()    { showAuthDialog(AuthMode.LOGIN); }
     @FXML private void onRegister() { showAuthDialog(AuthMode.REGISTER); }
@@ -92,8 +92,8 @@ public class MainController {
                         showAlert(Alert.AlertType.ERROR, "Sai tài khoản hoặc mật khẩu.");
                         return;
                     }
-                    User loggedIn = UserDAO.findByUsername(username.getText());	
-                    UserDAO.setOnline(loggedIn.getId(), true); 
+                    User loggedIn = UserDAO.findByUsername(username.getText());
+                    UserDAO.setOnline(loggedIn.getId(), true);
                     goToHome(loggedIn);
                 }
             } catch (SQLException e) {
@@ -109,7 +109,7 @@ public class MainController {
 
     private void goToHome(User loggedInUser) {
         try {
-            // 1) Tạo kết nối duy nhất
+            // 1) Kết nối server
             ClientConnection conn = new ClientConnection();
             boolean ok = conn.connect("127.0.0.1", 5000);
             if (!ok) {
@@ -117,44 +117,34 @@ public class MainController {
                 return;
             }
 
-            // 2) LOGIN ngay sau khi connect
-            conn.login(loggedInUser.getUsername());
+            // 2) Đăng ký (frame-based: REGISTER)
+            conn.register(loggedInUser.getUsername());
 
-            // 3) Bootstrap signaling (QUAN TRỌNG: làm TRƯỚC khi startListener)
+            // 3) Bootstrap signaling (đã dùng frame-based trong CallSignalingService mới)
             CallSignalingService callSvc = new CallSignalingService(conn);
-            // Nếu constructor của bạn KHÔNG tự attach thì nhớ:
-            // conn.attachCallService(callSvc);
 
             // 4) Load Home.fxml
             Stage stage = (Stage) loginBtn.getScene().getWindow();
             FXMLLoader loader = new FXMLLoader(getClass().getResource("/client/view/Home.fxml"));
             Parent root = loader.load();
 
-            // 5) Truyền user + connection + signaling xuống HomeController
+            // 5) Truyền user + connection + signaling
             HomeController home = loader.getController();
             home.setCurrentUser(loggedInUser);
-            home.setConnection(conn);          // KHÔNG tạo kết nối mới trong HomeController
-            home.setCallService(callSvc);      // <-- thêm setter này trong HomeController
+            home.setConnection(conn);     // Home/Mid sẽ tự startReader(Frame)
+            home.setCallService(callSvc);
             home.reloadAll();
 
-            // 6) Bắt đầu nghe server (CALL_* sẽ bị chặn trong ClientConnection nhờ callSvc)
-            // Nếu bạn đã startListener bên trong HomeController.setConnection(...) thì bỏ đoạn này.
-            conn.startListener(
-                line -> Platform.runLater(() -> home.onServerLine(line)),   // xử lý các dòng KHÔNG phải CALL_*
-                err  -> Platform.runLater(() -> home.onConnectionError(err))
-            );
-
-            // 7) Chuyển scene
+            // 6) Chuyển scene
             Scene scene = new Scene(root);
             scene.getStylesheets().add(getClass().getResource("/client/view/chat.css").toExternalForm());
             stage.setScene(scene);
             stage.centerOnScreen();
 
-            // 8) Đóng cửa sổ: set offline + QUIT + close
+            // 7) Đóng cửa sổ: set offline + đóng socket
             stage.setOnCloseRequest(ev -> {
                 try { UserDAO.setOnline(loggedInUser.getId(), false); } catch (Exception ignore) {}
-                try { conn.send("QUIT"); } catch (Exception ignore) {}
-                conn.close();
+                try { conn.close(); } catch (Exception ignore) {}
             });
 
         } catch (Exception e) {

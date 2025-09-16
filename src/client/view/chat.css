@@ -1,6 +1,15 @@
 /* Màu chủ đạo xanh */
 .root-bg {
     -fx-background-color: #F4F8FF;
+    -fx-in-bg: #E5EEFF;                 /* nền incoming */
+    -fx-in-border: #DDE9FF;             /* viền incoming */
+    -fx-in-text: #111827;               /* chữ chính incoming */
+    -fx-in-subtle: #6B7280;             /* chữ phụ incoming */
+
+    -fx-out-bg: #1882FF;                /* nền outgoing */
+    -fx-out-border: rgba(255,255,255,0.25);
+    -fx-out-text: white;                /* chữ chính outgoing */
+    -fx-out-subtle: rgba(255,255,255,0.85); /* chữ phụ outgoing */
 }
 
 /* Panel chung */
@@ -143,101 +152,143 @@
     -fx-background-color: #EFF6FF;
 }
 
+/* ================== LOOKUP MÀU CHUNG (JavaFX CSS looked-up values) ================== */
+.root {
+    -fx-in-bg: #E5EEFF;                 /* nền incoming */
+    -fx-in-border: #DDE9FF;             /* viền incoming */
+    -fx-in-text: #111827;               /* chữ chính incoming */
+    -fx-in-subtle: #6B7280;             /* chữ phụ incoming */
+
+    -fx-out-bg: #1882FF;                /* nền outgoing */
+    -fx-out-border: rgba(255,255,255,0.25);
+    -fx-out-text: white;                /* chữ chính outgoing */
+    -fx-out-subtle: rgba(255,255,255,0.85); /* chữ phụ outgoing */
+}
+
+/* ========= GỘP: Toàn bộ bubble INCOMING cùng màu nền & viền ========= */
+#incoming-text,
+#incoming-image,
+#incoming-file,
+#incoming-voice,
+#incoming-video {
+    -fx-background-color: -fx-in-bg;
+    -fx-background-radius: 12;
+    -fx-border-color: -fx-in-border;
+    -fx-border-width: 1;
+    -fx-border-radius: 12;
+}
+
+/* ========= GỘP: Toàn bộ bubble OUTGOING cùng màu nền & viền ========= */
+#outgoing-text,
+#outgoing-image,
+#outgoing-file,
+#outgoing-voice,
+#outgoing-video {
+    -fx-background-color: -fx-out-bg;
+    -fx-background-radius: 12;
+    -fx-border-color: -fx-out-border;
+    -fx-border-width: 0.5;
+    -fx-border-radius: 12;
+}
+
 /* ===== TEXT ===== */
 #incoming-text {
-    -fx-background-color: #E5EEFF;
-    -fx-background-radius: 14;
-    -fx-border-color: #DDE9FF;
-    -fx-border-width: 1;
-    -fx-border-radius: 14;
+    /* vẫn có thể khác radius 1 chút nếu bạn thích; nhưng đã đồng bộ màu ở trên */
     -fx-padding: 8 12 8 12;
+    -fx-background-radius: 14;
+    -fx-border-radius: 14;
 }
 #outgoing-text {
-    -fx-background-color: #1882FF;
-    -fx-background-radius: 14;
-    -fx-border-color: rgba(255,255,255,0.25);
-    -fx-border-width: 0.5;
-    -fx-border-radius: 14;
     -fx-padding: 8 12 8 12;
-    -fx-text-fill: white;
+    -fx-background-radius: 14;
+    -fx-border-radius: 14;
 }
 #incoming-text Label {
-    -fx-text-fill: #111827;
+    -fx-text-fill: -fx-in-text;
     -fx-font-size: 14px;
 }
 #outgoing-text Label {
-    -fx-text-fill: white;
+    -fx-text-fill: -fx-out-text;
     -fx-font-size: 14px;
 }
 
 /* ===== IMAGE ===== */
+/* ĐÃ đồng bộ màu nền/viền bằng nhóm gộp phía trên */
 #incoming-image {
-    -fx-background-color: white;
-    -fx-background-radius: 12;
-    -fx-border-color: #E5EEFF;
-    -fx-border-width: 1;
-    -fx-border-radius: 12;
     -fx-padding: 6;
 }
 #outgoing-image {
-    -fx-background-color: rgba(255,255,255,0.08);
-    -fx-background-radius: 12;
-    -fx-border-color: rgba(255,255,255,0.85);
-    -fx-border-width: 1;
-    -fx-border-radius: 12;
     -fx-padding: 6;
 }
 #incoming-image Label {
-    -fx-text-fill: #6B7280;
+    -fx-text-fill: -fx-in-subtle;
     -fx-font-size: 11px;
 }
 #outgoing-image Label {
-    -fx-text-fill: rgba(255,255,255,0.85);
+    -fx-text-fill: -fx-out-subtle;
     -fx-font-size: 11px;
 }
 
 /* ===== FILE ===== */
+/* ĐÃ đồng bộ nền/viền phía trên */
 #incoming-file {
-    -fx-background-color: #E5EEFF;
-    -fx-background-radius: 12;
-    -fx-border-color: #DDE9FF;
-    -fx-border-width: 1;
-    -fx-border-radius: 12;
     -fx-padding: 10 12 10 12;
 }
 #outgoing-file {
-    -fx-background-color: #1882FF;
-    -fx-background-radius: 12;
-    -fx-border-color: rgba(255,255,255,0.25);
-    -fx-border-width: 0.5;
-    -fx-border-radius: 12;
     -fx-padding: 10 12 10 12;
 }
 #incoming-file .file-name { -fx-font-weight: bold; -fx-text-fill: #0F172A; }
 #outgoing-file .file-name { -fx-font-weight: bold; -fx-text-fill: white; }
-#incoming-file .meta { -fx-font-size: 11px; -fx-text-fill: #6B7280; }
-#outgoing-file .meta { -fx-font-size: 11px; -fx-text-fill: rgba(255,255,255,0.85); }
+#incoming-file .meta { -fx-font-size: 11px; -fx-text-fill: -fx-in-subtle; }
+#outgoing-file .meta { -fx-font-size: 11px; -fx-text-fill: -fx-out-subtle; }
 
 /* ===== VOICE ===== */
-#incoming-voice {
-    -fx-background-color: #E5EEFF;
-    -fx-background-radius: 12;
-    -fx-border-color: #DDE9FF;
-    -fx-border-width: 1;
-    -fx-border-radius: 12;
-    -fx-padding: 8 12 8 12;
+/* ĐÃ đồng bộ nền/viền phía trên */
+#incoming-voice { -fx-padding: 8 12 8 12; }
+#outgoing-voice { -fx-padding: 8 12 8 12; }
+#incoming-voice Label { -fx-text-fill: -fx-in-text;  -fx-font-size: 11px; }
+#outgoing-voice Label { -fx-text-fill: -fx-out-text; -fx-font-size: 11px; }
+/* Nút play/pause (voice) */
+#incoming-voice .audio-btn {
+    -fx-background-color: rgba(0,0,0,0.05);
+    -fx-text-fill: -fx-in-text;
 }
-#outgoing-voice {
-    -fx-background-color: #1882FF;
-    -fx-background-radius: 12;
-    -fx-border-color: rgba(255,255,255,0.25);
-    -fx-border-width: 0.5;
-    -fx-border-radius: 12;
-    -fx-padding: 8 12 8 12;
+#outgoing-voice .audio-btn {
+    -fx-background-color: rgba(255,255,255,0.25);
+    -fx-text-fill: -fx-out-text;
 }
-#incoming-voice Label { -fx-text-fill: #111827; -fx-font-size: 11px; }
-#outgoing-voice Label { -fx-text-fill: white; -fx-font-size: 11px; }
-#outgoing-voice .audio-btn { -fx-background-color: rgba(255,255,255,0.25); -fx-text-fill: white; }
+
+/* ===== VIDEO (MỚI) ===== */
+/* Bubble cho video đã đồng bộ màu nền/viền ở nhóm gộp */
+#incoming-video { -fx-padding: 8 12 8 12; }
+#outgoing-video { -fx-padding: 8 12 8 12; }
+
+/* Tiêu đề/phụ đề bên dưới video (Label trong bubble video) */
+#incoming-video Label { -fx-text-fill: -fx-in-subtle; -fx-font-size: 11px; }
+#outgoing-video Label { -fx-text-fill: -fx-out-subtle; -fx-font-size: 11px; }
+
+/* Nút điều khiển trong bubble video (dùng cho Button bất kỳ bên trong) */
+#incoming-video Button {
+    -fx-background-color: rgba(0,0,0,0.05);
+    -fx-text-fill: -fx-in-text;
+    -fx-background-radius: 8;
+    -fx-padding: 4 10 4 10;
+}
+#outgoing-video Button {
+    -fx-background-color: rgba(255,255,255,0.25);
+    -fx-text-fill: -fx-out-text;
+    -fx-background-radius: 8;
+    -fx-padding: 4 10 4 10;
+}
+
+/* Thanh trượt tiến trình (Slider) trong bubble video */
+#incoming-video Slider {
+    -fx-pref-width: 220;
+}
+#outgoing-video Slider {
+    -fx-pref-width: 220;
+}
+
 
 /* Khối tổng thể accordion */
 .accordion {
