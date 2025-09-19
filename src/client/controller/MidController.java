@@ -8,6 +8,7 @@ import client.controller.mid.MessageHandler;
 import client.controller.mid.SessionHandler;
 import client.controller.mid.UIMessageHandler;
 import client.controller.mid.UtilHandler;
+import client.controller.mid.VoiceRecordHandler;
 import client.media.CallOffer;
 import client.media.LanAudioSession;
 import client.media.LanVideoSession;
@@ -33,7 +34,7 @@ import javafx.scene.media.Media;
 import javafx.scene.media.MediaPlayer;
 import javafx.scene.media.MediaView;
 import javafx.stage.Stage;
-import javafx.util.Duration;
+import javafx.stage.Window;
 import server.dao.UserDAO;
 
 import java.io.BufferedOutputStream;
@@ -44,6 +45,9 @@ import java.sql.SQLException;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
+
+import javax.sound.sampled.AudioFormat;
 
 public class MidController implements CallSignalListener {
     private Label currentChatName;
@@ -68,15 +72,15 @@ public class MidController implements CallSignalListener {
     private LanVideoSession videoSession;
     private LanAudioSession audioSession;
 
-    // ========= File/UI state =========
     private final Map<String, List<Frame>> pendingFileEvents = new ConcurrentHashMap<>();
     private final Map<String, String> fileIdToName = new ConcurrentHashMap<>();
     private final Map<String, String> fileIdToMime = new ConcurrentHashMap<>();
     public final Map<String, HBox> outgoingFileBubbles = new ConcurrentHashMap<>();
 
-    // Bên nhận: ghi file tạm
     private final Map<String, BufferedOutputStream> dlOut = new ConcurrentHashMap<>();
     private final Map<String, File> dlPath = new ConcurrentHashMap<>();
+
+    private final VoiceRecordHandler voiceRecordHandler = new VoiceRecordHandler();
 
     public void bind(Label currentChatName, Label currentChatStatus,
                      VBox messageContainer, TextField messageField, Button logoutBtn) {
@@ -138,7 +142,6 @@ public class MidController implements CallSignalListener {
         }
 
         this.currentPeerUser = u;
-        // xử lý FILE_EVT pending
         List<Frame> pending = pendingFileEvents.remove(u.getUsername());
         if (pending != null) pending.forEach(this::handleServerFrame);
     }
@@ -153,8 +156,6 @@ public class MidController implements CallSignalListener {
         }
         return null;
     }
-
-    /* ============ UI helpers ============ */
 
     public void showErrorAlert(String message) {
         Alert alert = new Alert(Alert.AlertType.ERROR);
@@ -236,7 +237,6 @@ public class MidController implements CallSignalListener {
         return UtilHandler.guessExt(mime, fallbackName);
     }
 
-    /* ================= CALL area giữ nguyên (không đổi) ================= */
     public void callCurrentPeer() {
         new CallHandler(this).callCurrentPeer();
     }
@@ -305,7 +305,10 @@ public class MidController implements CallSignalListener {
         new CallHandler(this).closeCallWindow();
     }
 
-    // Getters for fields needed by handlers
+    public void showVoiceRecordDialog(Window owner, AudioFormat format, File audioFile, Consumer<byte[]> onComplete) {
+        voiceRecordHandler.showVoiceRecordDialog(owner, format, audioFile, onComplete);
+    }
+
     public Label getCurrentChatName() { return currentChatName; }
     public Label getCurrentChatStatus() { return currentChatStatus; }
     public VBox getMessageContainer() { return messageContainer; }
@@ -331,7 +334,6 @@ public class MidController implements CallSignalListener {
     public Map<String, BufferedOutputStream> getDlOut() { return dlOut; }
     public Map<String, File> getDlPath() { return dlPath; }
 
-    // Setters for fields modified by handlers
     public void setCallStage(Stage callStage) { this.callStage = callStage; }
     public void setCallCtrl(VideoCallController callCtrl) { this.callCtrl = callCtrl; }
     public void setCurrentCallId(String currentCallId) { this.currentCallId = currentCallId; }
