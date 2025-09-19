@@ -364,16 +364,16 @@
 }
 
 /* ========== Call window compact (square) ========== */
-.call-card {
+#call-card {
   -fx-background-color: white;
   -fx-background-radius: 0;          /* góc vuông */
   -fx-padding: 12;
   -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.18), 24, 0.25, 0, 8);
 }
-.call-title { -fx-font-size: 18px; -fx-font-weight: 800; -fx-text-fill: #111827; }
-.call-subtitle { -fx-font-size: 13px; -fx-text-fill: #6B7280; }
+#call-title { -fx-font-size: 18px; -fx-font-weight: 800; -fx-text-fill: #111827; }
+#call-subtitle { -fx-font-size: 13px; -fx-text-fill: #6B7280; }
 
-.avatar {
+#avatar {
   -fx-min-width: 56; -fx-min-height: 56;
   -fx-alignment: center;
   -fx-background-radius: 0;          /* góc vuông cho avatar */
@@ -391,18 +391,18 @@
 }
 
 /* Buttons — square look */
-.btn { -fx-background-radius: 0; -fx-padding: 10 18; -fx-font-weight: 700; }
-.btn-accept { -fx-background-color: #10B981; -fx-text-fill: white; }
-.btn-accept:hover { -fx-background-color: #0EA371; }
-.btn-reject, .btn-hangup { -fx-background-color: #EF4444; -fx-text-fill: white; }
-.btn-reject:hover, .btn-hangup:hover { -fx-background-color: #DC2626; }
-.btn-cancel {
+#btn { -fx-background-radius: 0; -fx-padding: 10 18; -fx-font-weight: 700; }
+#btn-accept { -fx-background-color: #10B981; -fx-text-fill: white; }
+#btn-accept:hover { -fx-background-color: #0EA371; }
+#btn-reject, .btn-hangup { -fx-background-color: #EF4444; -fx-text-fill: white; }
+#btn-reject:hover, .btn-hangup:hover { -fx-background-color: #DC2626; }
+#btn-cancel {
   -fx-background-radius: 0;
   -fx-background-color: transparent; -fx-text-fill: #374151;
   -fx-border-color: #D1D5DB; -fx-border-radius: 0; -fx-padding: 9 17;
 }
-.btn-cancel:hover { -fx-background-color: #F3F4F6; }
-.call-actions > .button { -fx-min-width: 130; }
+#btn-cancel:hover { -fx-background-color: #F3F4F6; }
+#call-actions > .button { -fx-min-width: 130; }
 
 /*===== VOICE RECORD ===== */
 #voice-dialog {

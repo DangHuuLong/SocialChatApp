@@ -20,24 +20,37 @@ public class VideoCallController {
 
     @FXML private HBox incomingBtns, outgoingBtns, connectedBtns;
 
-    @FXML private StackPane videoStack;      // container video
-    @FXML private ImageView remoteVideo;     // KHUNG LỚN (đối phương)
-    @FXML private ImageView localPreview;    // PIP (của mình)
+    @FXML private StackPane videoStack;      
+    @FXML private ImageView remoteVideo;    
+    @FXML private ImageView localPreview;   
 
-    @FXML private Button acceptBtn, rejectBtn, cancelBtn, hangupBtn;
+    @FXML private Button acceptBtn, rejectBtn, cancelBtn, hangupBtn, videoToggleBtn, audioToggleBtn;
+    @FXML private Label cameraOffLabel; 
 
     private CallSignalingService callSvc;
     private String peer;
     private String callId;
     private Mode mode = Mode.INCOMING;
-    private Runnable onCloseWindow; // MidController cung cấp
+    private Runnable onCloseWindow; 
+    
+    private boolean isVideoEnabled = true; 
+    private boolean isAudioEnabled = true; 
+    private MidController controller;
 
     public void init(CallSignalingService svc, String peer, String callId,
-                     Mode initialMode, Runnable onCloseWindow) {
+                     Mode initialMode, Runnable onCloseWindow, MidController controller) {
         this.callSvc = svc;
         this.peer = peer;
         this.callId = callId;
         this.onCloseWindow = onCloseWindow;
+        
+        this.controller = controller;
+        
+        updateVideoButtonText();
+        updateAudioButtonText();
+        
+        videoToggleBtn.setOnAction(e -> toggleVideo());
+        audioToggleBtn.setOnAction(e -> toggleAudio());
 
         peerLabel.setText("@" + peer);
         String initials = (peer == null || peer.isEmpty())
@@ -117,4 +130,30 @@ public class VideoCallController {
     // === Getters để LanVideoSession set hình ===
     public ImageView getRemoteView() { return remoteVideo; }
     public ImageView getLocalView()  { return localPreview; }
+    
+    private void toggleVideo() {
+        if (controller.getVideoSession() != null) {
+            isVideoEnabled = !isVideoEnabled;
+            controller.getVideoSession().setVideoEnabled(isVideoEnabled);
+            updateVideoButtonText();
+            cameraOffLabel.setVisible(!isVideoEnabled);
+            localPreview.setVisible(isVideoEnabled);
+        }
+    }
+
+    private void toggleAudio() {
+        if (controller.getAudioSession() != null) {
+            isAudioEnabled = !isAudioEnabled;
+            controller.getAudioSession().setAudioEnabled(isAudioEnabled);
+            updateAudioButtonText();
+        }
+    }
+
+    private void updateVideoButtonText() {
+        videoToggleBtn.setText(isVideoEnabled ? "📷" : "📷 Tắt");
+    }
+
+    private void updateAudioButtonText() {
+        audioToggleBtn.setText(isAudioEnabled ? "🎤" : "🎤 Tắt");
+    }
 }

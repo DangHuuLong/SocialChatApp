@@ -27,6 +27,8 @@ public class LanAudioSession {
     // lines
     private TargetDataLine  mic;
     private SourceDataLine  speaker;
+    
+    private boolean audioEnabled = true;
 
     // ===== caller chuẩn bị port audio (trên host đã biết) =====
     public int prepareCaller(String host) throws IOException {
@@ -117,25 +119,23 @@ public class LanAudioSession {
 
             while (running && socket.isConnected()) {
                 int n;
-                if (MOCK_MIC || mic == null) {
-                    // tạo sóng sin 16-bit
+                if (!audioEnabled || MOCK_MIC || mic == null) {
                     for (int i = 0; i < FRAME_BYTES; i += 2) {
-                        short s = (short) (Math.sin(phase) * 12000);
-                        buf[i]   = (byte) (s & 0xFF);
-                        buf[i+1] = (byte) ((s >> 8) & 0xFF);
+                        short s = (MOCK_MIC && audioEnabled) ? (short) (Math.sin(phase) * 12000) : 0;
+                        buf[i] = (byte) (s & 0xFF);
+                        buf[i + 1] = (byte) ((s >> 8) & 0xFF);
                         phase += step;
-                        if (phase > 2*Math.PI) phase -= 2*Math.PI;
+                        if (phase > 2 * Math.PI) phase -= 2 * Math.PI;
                     }
                     n = FRAME_BYTES;
                 } else {
                     n = mic.read(buf, 0, FRAME_BYTES);
                     if (n <= 0) continue;
                 }
-                // length-prefix
                 out.write((n >>> 24) & 0xFF);
                 out.write((n >>> 16) & 0xFF);
-                out.write((n >>>  8) & 0xFF);
-                out.write( n         & 0xFF);
+                out.write((n >>> 8) & 0xFF);
+                out.write(n & 0xFF);
                 out.write(buf, 0, n);
                 out.flush();
             }
@@ -181,5 +181,33 @@ public class LanAudioSession {
 
     private void ensureNotRunning() throws IOException {
         if (running) throw new IOException("Audio already running");
+    }
+    
+    public void setAudioEnabled(boolean enabled) {
+        audioEnabled = enabled;
+        if (!enabled && mic != null) {
+            // Đóng mic nếu đang bật
+            try {
+                mic.stop();
+                mic.close();
+                mic = null;
+                System.out.println("[AUDIO] Microphone closed (audio disabled)");
+            } catch (Exception e) {
+                System.out.println("[AUDIO] Error closing mic: " + e);
+            }
+        } else if (enabled && mic == null && !MOCK_MIC) {
+            // Mở lại mic nếu không ở chế độ mock
+            try {
+                AudioFormat fmt = new AudioFormat(SAMPLE_RATE, 16, 1, true, false);
+                DataLine.Info mInfo = new DataLine.Info(TargetDataLine.class, fmt);
+                mic = (TargetDataLine) AudioSystem.getLine(mInfo);
+                mic.open(fmt);
+                mic.start();
+                System.out.println("[AUDIO] Microphone reopened (audio enabled)");
+            } catch (Exception e) {
+                System.out.println("[AUDIO] Error reopening mic: " + e);
+                mic = null;
+            }
+        }
     }
 }

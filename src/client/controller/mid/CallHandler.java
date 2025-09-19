@@ -125,10 +125,10 @@ public class CallHandler {
                 controller.getCallStage().close();
                 controller.setCallStage(null);
             }
-            FXMLLoader fx = new FXMLLoader(getClass().getResource("/client/view/VideoCallOverlay.fxml"));
+            FXMLLoader fx = new FXMLLoader(getClass().getResource("/client/view/VideoCall.fxml"));
             Parent root = fx.load();
             controller.setCallCtrl(fx.getController());
-            controller.getCallCtrl().init(controller.getCallSvc(), peer, callId, mode, this::closeCallWindow);
+            controller.getCallCtrl().init(controller.getCallSvc(), peer, callId, mode, this::closeCallWindow, controller);
             controller.setCallStage(new Stage());
             controller.getCallStage().setTitle("Call • @" + peer);
             controller.getCallStage().setResizable(true);

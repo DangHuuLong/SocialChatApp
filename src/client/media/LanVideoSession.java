@@ -52,6 +52,8 @@ public class LanVideoSession {
     private ImageView localView;
     private ImageView remoteView;
     private BufferedImage mockFrame; // bộ đệm cho mock
+    
+    private boolean videoEnabled = true;
 
     // ======= OFFER JSON =======
     public static class OfferInfo {
@@ -307,6 +309,15 @@ public class LanVideoSession {
 
     // ===== helpers =====
     private BufferedImage grabFrame() {
+        if (!videoEnabled) {
+            // Trả về khung trống khi video bị tắt
+            BufferedImage blank = new BufferedImage(width, height, BufferedImage.TYPE_3BYTE_BGR);
+            var g = blank.createGraphics();
+            g.setColor(java.awt.Color.BLACK);
+            g.fillRect(0, 0, width, height);
+            g.dispose();
+            return blank;
+        }
         if (MOCK) {
             if (mockFrame == null)
                 mockFrame = new BufferedImage(width, height, BufferedImage.TYPE_3BYTE_BGR);
@@ -319,6 +330,10 @@ public class LanVideoSession {
             g.drawString(MOCK_TEXT + "  " + ts, 20, 40);
             g.dispose();
             return mockFrame;
+        }
+        if (webcam == null) {
+            System.out.println("[MEDIA] Webcam is null when enabled, attempting to reopen");
+            setVideoEnabled(true); 
         }
         return (webcam != null) ? webcam.getImage() : null;
     }
@@ -373,5 +388,30 @@ public class LanVideoSession {
 
     private void ensureNotRunning() throws IOException {
         if (running) throw new IOException("Session already running");
+    }
+
+    public void setVideoEnabled(boolean enabled) {
+        videoEnabled = enabled;
+        if (!enabled && webcam != null) {
+            try {
+                webcam.close();
+                System.out.println("[MEDIA] Webcam closed (video disabled)");
+            } catch (Exception e) {
+                System.out.println("[MEDIA] Error closing webcam: " + e);
+            }
+            webcam = null;
+        } else if (enabled && webcam == null && !MOCK) {
+            try {
+                webcam = CAMERA_NAME.isBlank() ? Webcam.getDefault() : Webcam.getWebcamByName(CAMERA_NAME);
+                if (webcam != null) {
+                    webcam.setViewSize(new Dimension(width, height));
+                    webcam.open(true);
+                    System.out.println("[MEDIA] Webcam reopened (video enabled)");
+                }
+            } catch (Exception e) {
+                System.out.println("[MEDIA] Error reopening webcam: " + e);
+                webcam = null;
+            }
+        }
     }
 }

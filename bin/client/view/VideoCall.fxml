@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.image.ImageView?>
+
+<StackPane xmlns="http://javafx.com/javafx" xmlns:fx="http://javafx.com/fxml/1"
+           fx:controller="client.controller.VideoCallController"
+           stylesheets="@../../css/chat.css">
+  <children>
+    <BorderPane maxWidth="1080" maxHeight="720" id="call-card">
+      <top>
+        <HBox spacing="16" alignment="CENTER_LEFT" BorderPane.alignment="CENTER"
+              style="-fx-padding: 16 20 0 20;">
+          <Label fx:id="avatarLabel" text="A" id="avatar"/>
+          <VBox spacing="6">
+            <Label fx:id="statusLabel" text="Incoming call…" id="call-title"/>
+            <Label fx:id="peerLabel" text="@user" id="call-subtitle"/>
+          </VBox>
+        </HBox>
+      </top>
+      <center>
+        <StackPane fx:id="videoStack" visible="false" managed="false" id="video-stack"
+                   BorderPane.alignment="CENTER">
+          <ImageView fx:id="remoteVideo" preserveRatio="true" smooth="true" id="remote-video"/>
+          <AnchorPane pickOnBounds="false" mouseTransparent="true">
+            <children>
+              <ImageView fx:id="localPreview" preserveRatio="true" smooth="true" fitWidth="280" id="local-preview">
+                <AnchorPane.rightAnchor>20</AnchorPane.rightAnchor>
+                <AnchorPane.bottomAnchor>20</AnchorPane.bottomAnchor>
+              </ImageView>
+              <Label fx:id="cameraOffLabel" text="Camera Off" id="camera-off-label" visible="false"
+                     AnchorPane.rightAnchor="20" AnchorPane.bottomAnchor="20"/>
+            </children>
+          </AnchorPane>
+        </StackPane>
+      </center>
+      <bottom>
+        <VBox spacing="12" alignment="CENTER" BorderPane.alignment="CENTER"
+              style="-fx-padding: 10 0 20 0;">
+          <HBox fx:id="incomingBtns" spacing="16" alignment="CENTER" id="call-actions">
+            <Button fx:id="acceptBtn" text="📞 Accept" id="btn-accept"/>
+            <Button fx:id="rejectBtn" text="✖ Reject" id="btn-reject"/>
+          </HBox>
+          <HBox fx:id="outgoingBtns" spacing="16" alignment="CENTER" id="call-actions"
+                visible="false" managed="false">
+            <Button fx:id="cancelBtn" text="Cancel" id="btn-cancel"/>
+          </HBox>
+          <HBox fx:id="connectedBtns" spacing="16" alignment="CENTER" id="call-actions"
+                visible="false" managed="false">
+            <Button fx:id="hangupBtn" text="📞" id="btn-hangup"/>
+            <Button fx:id="videoToggleBtn" text="📷" id="video-toggle-btn"/>
+            <Button fx:id="audioToggleBtn" text="🎤" id="audio-toggle-btn"/>
+          </HBox>
+        </VBox>
+      </bottom>
+    </BorderPane>
+  </children>
+</StackPane>
