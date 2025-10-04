@@ -15,28 +15,46 @@
 
     <children>
         <!-- ============ SIDEBAR TRÁI ============ -->
-        <VBox fx:id="sidebar" prefWidth="260.0" minWidth="220.0" spacing="10"
-              styleClass="panel sidebar">
-            <children>
-                <Label text="Đoạn chat" styleClass="panel-title"/>
-                <TextField fx:id="searchField" promptText="Tìm kiếm..."
-                           styleClass="search-field"
-                           onAction="#searchUsers"/>
-                <ScrollPane fitToWidth="true" HBox.hgrow="NEVER" prefHeight="600.0"
-                            styleClass="list-scroll">
-                    <content>
-                        <VBox fx:id="chatList" spacing="6" fillWidth="true">
-                            <padding>
-                                <Insets top="10" right="10" bottom="10" left="10"/>
-                            </padding>
-                        </VBox>
-                    </content>
-                </ScrollPane>
-            </children>
-            <padding>
-                <Insets top="12" right="12" bottom="12" left="12"/>
-            </padding>
-        </VBox>
+        <VBox fx:id="sidebar" spacing="10" styleClass="panel sidebar">
+		    <children>
+		        <!-- Header: tiêu đề + nút thu/phóng -->
+		        <HBox fx:id="leftHeader" alignment="CENTER_LEFT" spacing="6">
+				    <children>
+				        <Label fx:id="titleLabel" text="Đoạn chat" styleClass="panel-title"/>
+				        <Region fx:id="leftHeaderSpacer" HBox.hgrow="ALWAYS"/>
+				        <Button fx:id="toggleSidebarBtn" text="⬅️" focusTraversable="false" styleClass="side-icon"/>
+				    </children>
+				</HBox>
+		
+		        <!-- Tìm kiếm: khi phóng to hiện TextField, khi thu nhỏ hiện nút 🔍 -->
+		        <TextField fx:id="searchField" promptText="Tìm kiếm..."
+		                   styleClass="search-field" onAction="#searchUsers"/>
+		        <Button fx:id="searchIconBtn" text="🔍" focusTraversable="false"
+		                styleClass="side-icon" visible="false" managed="false"/>
+		
+		        <!-- Danh sách chat -->
+		        <ScrollPane fitToWidth="true" HBox.hgrow="NEVER" prefHeight="600.0"
+		                    hbarPolicy="NEVER" styleClass="list-scroll">
+		            <content>
+		                <VBox fx:id="chatList" spacing="6" fillWidth="true">
+		                    <padding>
+		                        <Insets top="8" right="8" bottom="8" left="12"/>
+		                    </padding>
+		                </VBox>
+		            </content>
+		        </ScrollPane>
+		
+		        <!-- Đẩy footer xuống đáy -->
+		        <Region VBox.vgrow="ALWAYS"/>
+		
+		        <!-- Footer: Logout -->
+		        <Button fx:id="logoutBtn" text="🚪 Logout" styleClass="logout-btn"/>
+		    </children>
+		    <padding>
+		        <Insets top="12" right="12" bottom="12" left="12"/>
+		    </padding>
+		</VBox>
+
 
         <!-- ============ PANEL GIỮA ============ -->
         <StackPane fx:id="centerStack" HBox.hgrow="ALWAYS" styleClass="panel center-panel">
@@ -59,9 +77,7 @@
                             <children>
                                 <Button fx:id="callBtn"  text="Gọi"   styleClass="action-btn" onAction="#onCall"/>
                                 <Button fx:id="videoBtn" text="Video" styleClass="action-btn" onAction="#onCall"/>
-                                <Button text="⋯" styleClass="action-btn"/>
-                                <Button fx:id="logoutBtn" text="🚪 Logout" onAction="#onLogout"
-                                        style="-fx-background-color: #EF4444; -fx-text-fill: white; -fx-background-radius: 8; -fx-padding: 6 14;"/>
+                                <Button fx:id="toggleRightBtn" text="⋯" styleClass="action-btn" onAction="#onToggleRightPanel"/>
                             </children>
                         </HBox>
                     </children>

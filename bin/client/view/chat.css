@@ -1,18 +1,15 @@
-/* Màu chủ đạo xanh */
+/* ======================= THEME & PANEL ======================= */
 .root-bg {
     -fx-background-color: #F4F8FF;
-    -fx-in-bg: #E5EEFF;                 /* nền incoming */
-    -fx-in-border: #DDE9FF;             /* viền incoming */
-    -fx-in-text: #111827;               /* chữ chính incoming */
-    -fx-in-subtle: #6B7280;             /* chữ phụ incoming */
-
-    -fx-out-bg: #1882FF;                /* nền outgoing */
+    -fx-in-bg: #E5EEFF;
+    -fx-in-border: #DDE9FF;
+    -fx-in-text: #111827;
+    -fx-in-subtle: #6B7280;
+    -fx-out-bg: #1882FF;
     -fx-out-border: rgba(255,255,255,0.25);
-    -fx-out-text: white;                /* chữ chính outgoing */
-    -fx-out-subtle: rgba(255,255,255,0.85); /* chữ phụ outgoing */
+    -fx-out-text: white;
+    -fx-out-subtle: rgba(255,255,255,0.85);
 }
-
-/* Panel chung */
 .panel {
     -fx-background-color: white;
     -fx-background-radius: 14;
@@ -22,14 +19,61 @@
     -fx-effect: dropshadow(gaussian, rgba(24,130,255,0.08), 12, 0.2, 0, 2);
 }
 
-/* Sidebar trái */
-.sidebar {
-    -fx-padding: 12;
+/* ======================= LEFT SIDEBAR ======================= */
+.sidebar { -fx-padding: 12; }
+
+/* chiều rộng khi thu nhỏ */
+.sidebar.collapsed {
+    -fx-min-width: 96;
+    -fx-pref-width: 96;
+    -fx-max-width: 96;
+    -fx-padding: 12 8 12 8;
 }
-.panel-title {
+
+/* icon vuông: toggle, search (và logout dạng compact) */
+.side-icon {
+    -fx-min-width: 40; -fx-pref-width: 40; -fx-max-width: 40;
+    -fx-min-height: 40; -fx-pref-height: 40; -fx-max-height: 40;
+    -fx-background-color: transparent;
+    -fx-background-radius: 8;
     -fx-font-size: 16px;
-    -fx-font-weight: bold;
+    -fx-padding: 0;
 }
+.side-icon:hover { -fx-background-color: rgba(0,0,0,0.05); -fx-cursor: hand; }
+
+/* logout luôn đỏ ở mọi trạng thái */
+.logout-btn {
+    -fx-background-color: #EF4444;
+    -fx-text-fill: white;
+    -fx-background-radius: 8;
+    -fx-padding: 8 12;
+    -fx-cursor: hand;
+    -fx-border-color: transparent;
+}
+.logout-btn:hover { -fx-background-color: #DC2626; }
+
+/* logout dạng icon-only khi thu nhỏ (chỉ đổi kích thước, KHÔNG đổi màu) */
+.logout-compact {
+    -fx-padding: 0;
+    -fx-min-width: 40; -fx-pref-width: 40; -fx-max-width: 40;
+    -fx-min-height: 40; -fx-pref-height: 40; -fx-max-height: 40;
+}
+
+/* list & item */
+.list-scroll { -fx-background-color: transparent; }
+.list-scroll .scroll-bar:horizontal { -fx-opacity: 0; -fx-pref-height: 0; }
+.sidebar.collapsed .list-scroll .viewport > .content { -fx-padding: 4 8 4 12; }
+
+.chat-item {
+    -fx-background-color: #ffffff;
+    -fx-background-radius: 10;
+    -fx-padding: 8;
+    -fx-cursor: hand;
+}
+.chat-item:hover { -fx-background-color: #EFF6FF; }
+.sidebar.collapsed .chat-item { -fx-padding: 4; -fx-background-insets: 0; -fx-spacing: 0; }
+
+.panel-title { -fx-font-size: 16px; -fx-font-weight: bold; }
 .search-field {
     -fx-background-radius: 8;
     -fx-border-radius: 8;
@@ -41,68 +85,31 @@
     -fx-border-color: #1882FF;
     -fx-effect: dropshadow(gaussian, rgba(24,130,255,0.25), 8, 0.2, 0, 0);
 }
-.list-scroll {
-    -fx-background-color: transparent;
-}
+.chat-name { -fx-font-weight: bold; -fx-text-fill: #0F172A; }
+.chat-last { -fx-text-fill: #6B7280; -fx-font-size: 12px; }
 
-/* Item trong danh sách chat */
-.chat-item {
-	-fx-background-color: #ffffff;
-    -fx-padding: 8;
-    -fx-background-radius: 10;
-    -fx-cursor: hand;
-}
-.chat-item:hover {
-    -fx-background-color: #EFF6FF;
-}
-.chat-name {
-    -fx-font-weight: bold;
-    -fx-text-fill: #0F172A;
-}
-.chat-last {
-    -fx-text-fill: #6B7280;
-    -fx-font-size: 12px;
-}
-
-/* Khu giữa */
-.center-panel { }
+/* ======================= CENTER AREA ======================= */
+.center-panel {}
 .chat-header {
     -fx-background-color: linear-gradient(to bottom, #FFFFFF, #F9FBFF);
     -fx-background-radius: 12;
     -fx-border-color: #E3EEFF;
     -fx-border-radius: 12;
 }
-.chat-title {
-    -fx-font-size: 16px;
-    -fx-font-weight: bold;
-}
-.chat-status-online {
-    -fx-text-fill: #16A34A;
-    -fx-font-size: 12px;
-}
-.chat-status-offline {
-    -fx-text-fill: #9CA3AF;
-    -fx-font-size: 12px;
-}
+.chat-title { -fx-font-size: 16px; -fx-font-weight: bold; }
+.chat-status-online { -fx-text-fill: #16A34A; -fx-font-size: 12px; }
+.chat-status-offline { -fx-text-fill: #9CA3AF; -fx-font-size: 12px; }
 .action-btn {
     -fx-background-color: #E8F1FF;
     -fx-text-fill: #0B5ED7;
     -fx-background-radius: 8;
-    -fx-padding: 6 12 6 12;
+    -fx-padding: 6 12;
     -fx-cursor: hand;
     -fx-border-color: transparent;
 }
-.action-btn:hover {
-    -fx-background-color: #DCEAFF;
-}
-.message-scroll {
-    -fx-background-color: transparent;
-}
-.placeholder {
-    -fx-text-fill: #9CA3AF;
-}
-
-/* Thanh nhập tin nhắn */
+.action-btn:hover { -fx-background-color: #DCEAFF; }
+.message-scroll { -fx-background-color: transparent; }
+.placeholder { -fx-text-fill: #9CA3AF; }
 .input-bar {
     -fx-background-color: #F7FAFF;
     -fx-background-radius: 12;
@@ -112,190 +119,90 @@
 .icon-btn {
     -fx-background-color: #E8F1FF;
     -fx-background-radius: 8;
-    -fx-padding: 6 10 6 10;
+    -fx-padding: 6 10;
     -fx-cursor: hand;
     -fx-border-color: transparent;
 }
-.icon-btn:hover {
-    -fx-background-color: #DCEAFF;
-}
+.icon-btn:hover { -fx-background-color: #DCEAFF; }
 .send-btn {
     -fx-background-color: #1882FF;
     -fx-text-fill: white;
     -fx-background-radius: 8;
-    -fx-padding: 6 16 6 16;
+    -fx-padding: 6 16;
     -fx-cursor: hand;
     -fx-border-color: transparent;
 }
-.send-btn:hover {
-    -fx-background-color: #0F6FDE;
-}
+.send-btn:hover { -fx-background-color: #0F6FDE; }
 
-/* Panel phải (thông tin đoạn chat) */
-.info-panel { }
-.info-header {
-    -fx-padding: 8 0 4 0;
-}
-.info-name {
-    -fx-font-size: 15px;
-    -fx-font-weight: bold;
-}
+/* ======================= RIGHT PANEL ======================= */
+.info-panel {}
+.info-header { -fx-padding: 8 0 4 0; }
+.info-name { -fx-font-size: 15px; -fx-font-weight: bold; }
 .menu-item {
     -fx-background-color: transparent;
     -fx-text-fill: #0F172A;
-    -fx-padding: 10 12 10 12;
+    -fx-padding: 10 12;
     -fx-background-radius: 8;
     -fx-cursor: hand;
     -fx-border-color: transparent;
 }
-.menu-item:hover {
-    -fx-background-color: #EFF6FF;
-}
+.menu-item:hover { -fx-background-color: #EFF6FF; }
 
-/* ================== LOOKUP MÀU CHUNG (JavaFX CSS looked-up values) ================== */
+/* ======================= BUBBLES (IN/OUT) ======================= */
 .root {
-    -fx-in-bg: #E5EEFF;                 /* nền incoming */
-    -fx-in-border: #DDE9FF;             /* viền incoming */
-    -fx-in-text: #111827;               /* chữ chính incoming */
-    -fx-in-subtle: #6B7280;             /* chữ phụ incoming */
-
-    -fx-out-bg: #1882FF;                /* nền outgoing */
+    -fx-in-bg: #E5EEFF;
+    -fx-in-border: #DDE9FF;
+    -fx-in-text: #111827;
+    -fx-in-subtle: #6B7280;
+    -fx-out-bg: #1882FF;
     -fx-out-border: rgba(255,255,255,0.25);
-    -fx-out-text: white;                /* chữ chính outgoing */
-    -fx-out-subtle: rgba(255,255,255,0.85); /* chữ phụ outgoing */
+    -fx-out-text: white;
+    -fx-out-subtle: rgba(255,255,255,0.85);
 }
-
-/* ========= GỘP: Toàn bộ bubble INCOMING cùng màu nền & viền ========= */
-#incoming-text,
-#incoming-image,
-#incoming-file,
-#incoming-voice,
-#incoming-video {
+#incoming-text, #incoming-image, #incoming-file, #incoming-voice, #incoming-video {
     -fx-background-color: -fx-in-bg;
     -fx-background-radius: 12;
     -fx-border-color: -fx-in-border;
     -fx-border-width: 1;
     -fx-border-radius: 12;
 }
-
-/* ========= GỘP: Toàn bộ bubble OUTGOING cùng màu nền & viền ========= */
-#outgoing-text,
-#outgoing-image,
-#outgoing-file,
-#outgoing-voice,
-#outgoing-video {
+#outgoing-text, #outgoing-image, #outgoing-file, #outgoing-voice, #outgoing-video {
     -fx-background-color: -fx-out-bg;
     -fx-background-radius: 12;
     -fx-border-color: -fx-out-border;
     -fx-border-width: 0.5;
     -fx-border-radius: 12;
 }
+#incoming-text, #outgoing-text { -fx-padding: 8 12; -fx-background-radius: 14; -fx-border-radius: 14; }
+#incoming-text Label { -fx-text-fill: -fx-in-text; -fx-font-size: 14px; }
+#outgoing-text Label { -fx-text-fill: -fx-out-text; -fx-font-size: 14px; }
 
-/* ===== TEXT ===== */
-#incoming-text {
-    /* vẫn có thể khác radius 1 chút nếu bạn thích; nhưng đã đồng bộ màu ở trên */
-    -fx-padding: 8 12 8 12;
-    -fx-background-radius: 14;
-    -fx-border-radius: 14;
-}
-#outgoing-text {
-    -fx-padding: 8 12 8 12;
-    -fx-background-radius: 14;
-    -fx-border-radius: 14;
-}
-#incoming-text Label {
-    -fx-text-fill: -fx-in-text;
-    -fx-font-size: 14px;
-}
-#outgoing-text Label {
-    -fx-text-fill: -fx-out-text;
-    -fx-font-size: 14px;
-}
+#incoming-image, #outgoing-image { -fx-padding: 6; }
+#incoming-image Label { -fx-text-fill: -fx-in-subtle; -fx-font-size: 11px; }
+#outgoing-image Label { -fx-text-fill: -fx-out-subtle; -fx-font-size: 11px; }
 
-/* ===== IMAGE ===== */
-/* ĐÃ đồng bộ màu nền/viền bằng nhóm gộp phía trên */
-#incoming-image {
-    -fx-padding: 6;
-}
-#outgoing-image {
-    -fx-padding: 6;
-}
-#incoming-image Label {
-    -fx-text-fill: -fx-in-subtle;
-    -fx-font-size: 11px;
-}
-#outgoing-image Label {
-    -fx-text-fill: -fx-out-subtle;
-    -fx-font-size: 11px;
-}
-
-/* ===== FILE ===== */
-/* ĐÃ đồng bộ nền/viền phía trên */
-#incoming-file {
-    -fx-padding: 10 12 10 12;
-}
-#outgoing-file {
-    -fx-padding: 10 12 10 12;
-}
+#incoming-file, #outgoing-file { -fx-padding: 10 12; }
 #incoming-file .file-name { -fx-font-weight: bold; -fx-text-fill: #0F172A; }
 #outgoing-file .file-name { -fx-font-weight: bold; -fx-text-fill: white; }
 #incoming-file .meta { -fx-font-size: 11px; -fx-text-fill: -fx-in-subtle; }
 #outgoing-file .meta { -fx-font-size: 11px; -fx-text-fill: -fx-out-subtle; }
 
-/* ===== VOICE ===== */
-/* ĐÃ đồng bộ nền/viền phía trên */
-#incoming-voice { -fx-padding: 8 12 8 12; }
-#outgoing-voice { -fx-padding: 8 12 8 12; }
-#incoming-voice Label { -fx-text-fill: -fx-in-text;  -fx-font-size: 11px; }
+#incoming-voice, #outgoing-voice { -fx-padding: 8 12; }
+#incoming-voice Label { -fx-text-fill: -fx-in-text; -fx-font-size: 11px; }
 #outgoing-voice Label { -fx-text-fill: -fx-out-text; -fx-font-size: 11px; }
-/* Nút play/pause (voice) */
-#incoming-voice .audio-btn {
-    -fx-background-color: rgba(0,0,0,0.05);
-    -fx-text-fill: -fx-in-text;
-}
-#outgoing-voice .audio-btn {
-    -fx-background-color: rgba(255,255,255,0.25);
-    -fx-text-fill: -fx-out-text;
-}
+#incoming-voice .audio-btn { -fx-background-color: rgba(0,0,0,0.05); -fx-text-fill: -fx-in-text; }
+#outgoing-voice .audio-btn { -fx-background-color: rgba(255,255,255,0.25); -fx-text-fill: -fx-out-text; }
 
-/* ===== VIDEO (MỚI) ===== */
-/* Bubble cho video đã đồng bộ màu nền/viền ở nhóm gộp */
-#incoming-video { -fx-padding: 8 12 8 12; }
-#outgoing-video { -fx-padding: 8 12 8 12; }
-
-/* Tiêu đề/phụ đề bên dưới video (Label trong bubble video) */
+#incoming-video, #outgoing-video { -fx-padding: 8 12; }
 #incoming-video Label { -fx-text-fill: -fx-in-subtle; -fx-font-size: 11px; }
 #outgoing-video Label { -fx-text-fill: -fx-out-subtle; -fx-font-size: 11px; }
+#incoming-video Button, #outgoing-video Button { -fx-background-radius: 8; -fx-padding: 4 10; }
+#incoming-video Button { -fx-background-color: rgba(0,0,0,0.05); -fx-text-fill: -fx-in-text; }
+#outgoing-video Button { -fx-background-color: rgba(255,255,255,0.25); -fx-text-fill: -fx-out-text; }
+#incoming-video Slider, #outgoing-video Slider { -fx-pref-width: 220; }
 
-/* Nút điều khiển trong bubble video (dùng cho Button bất kỳ bên trong) */
-#incoming-video Button {
-    -fx-background-color: rgba(0,0,0,0.05);
-    -fx-text-fill: -fx-in-text;
-    -fx-background-radius: 8;
-    -fx-padding: 4 10 4 10;
-}
-#outgoing-video Button {
-    -fx-background-color: rgba(255,255,255,0.25);
-    -fx-text-fill: -fx-out-text;
-    -fx-background-radius: 8;
-    -fx-padding: 4 10 4 10;
-}
-
-/* Thanh trượt tiến trình (Slider) trong bubble video */
-#incoming-video Slider {
-    -fx-pref-width: 220;
-}
-#outgoing-video Slider {
-    -fx-pref-width: 220;
-}
-
-
-/* Khối tổng thể accordion */
-.accordion {
-    -fx-background-color: transparent;
-}
-
-/* TitledPane (header + content) */
+/* ======================= ACCORDION (RIGHT) ======================= */
+.accordion { -fx-background-color: transparent; }
 .menu-pane {
     -fx-background-radius: 10;
     -fx-border-radius: 10;
@@ -304,26 +211,17 @@
     -fx-padding: 0;
     -fx-background-color: white;
     -fx-effect: dropshadow(gaussian, rgba(24,130,255,0.08), 8, 0.2, 0, 1);
-    -fx-margin: 4 0 0 0; /* nếu không ăn, thêm khoảng cách ở container cha */
 }
-
-/* Header của TitledPane */
 .menu-pane > .title {
     -fx-background-color: #F4F8FF;
     -fx-background-insets: 0;
     -fx-background-radius: 10 10 0 0;
-    -fx-padding: 10 12 10 12;
+    -fx-padding: 10 12;
     -fx-font-weight: bold;
     -fx-text-fill: #0F172A;
     -fx-cursor: hand;
 }
-
-/* Khi focus/hover header */
-.menu-pane > .title:hover {
-    -fx-background-color: #EFF6FF;
-}
-
-/* Nội dung xổ xuống */
+.menu-pane > .title:hover { -fx-background-color: #EFF6FF; }
 .menu-pane > *.content {
     -fx-background-color: white;
     -fx-background-insets: 0;
@@ -331,66 +229,37 @@
     -fx-padding: 8 12 10 12;
     -fx-border-color: transparent;
 }
+.submenu { -fx-padding: 0 0 0 8; }
+.submenu-item { -fx-text-fill: #374151; -fx-font-size: 13px; -fx-padding: 6 4; -fx-background-radius: 6; }
+.submenu-item:hover { -fx-background-color: #EFF6FF; -fx-text-fill: #1882FF; }
 
-/* Nhóm item con */
-.submenu {
-    -fx-padding: 0 0 0 8; /* thụt vào nhẹ */
-}
+.empty-state { -fx-background-color: #f3f4f6; -fx-padding: 16; }
+.empty-title { -fx-font-size: 16px; -fx-text-fill: #111827; -fx-font-weight: bold; }
+.empty-subtitle { -fx-font-size: 12px; -fx-text-fill: #6b7280; }
 
-/* Item con */
-.submenu-item {
-    -fx-text-fill: #374151;
-    -fx-font-size: 13px;
-    -fx-padding: 6 4 6 4;
-    -fx-background-radius: 6;
-}
-.submenu-item:hover {
-    -fx-background-color: #EFF6FF;
-    -fx-text-fill: #1882FF;
-}
-
-.empty-state {
-    -fx-background-color: #f3f4f6; /* xám nhạt */
-    -fx-padding: 16;
-}
-.empty-title {
-    -fx-font-size: 16px;
-    -fx-text-fill: #111827;
-    -fx-font-weight: bold;
-}
-.empty-subtitle {
-    -fx-font-size: 12px;
-    -fx-text-fill: #6b7280;
-}
-
-/* ========== Call window compact (square) ========== */
+/* ======================= CALL WINDOW ======================= */
 #call-card {
   -fx-background-color: white;
-  -fx-background-radius: 0;          /* góc vuông */
+  -fx-background-radius: 0;
   -fx-padding: 12;
   -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.18), 24, 0.25, 0, 8);
 }
 #call-title { -fx-font-size: 18px; -fx-font-weight: 800; -fx-text-fill: #111827; }
 #call-subtitle { -fx-font-size: 13px; -fx-text-fill: #6B7280; }
-
 #avatar {
   -fx-min-width: 56; -fx-min-height: 56;
   -fx-alignment: center;
-  -fx-background-radius: 0;          /* góc vuông cho avatar */
+  -fx-background-radius: 0;
   -fx-text-fill: white;
   -fx-font-size: 18px; -fx-font-weight: 800;
   -fx-background-color: linear-gradient(to bottom right, #60A5FA, #2563EB);
 }
-
-/* Video box (chỉ khi CONNECTED mới hiện) */
 .video-area {
   -fx-background-color: linear-gradient(to bottom right, #f8fafc, #eef2f7);
-  -fx-background-radius: 0;          /* góc vuông */
+  -fx-background-radius: 0;
   -fx-border-color: #e5e7eb;
   -fx-border-radius: 0;
 }
-
-/* Buttons — square look */
 #btn { -fx-background-radius: 0; -fx-padding: 10 18; -fx-font-weight: 700; }
 #btn-accept { -fx-background-color: #10B981; -fx-text-fill: white; }
 #btn-accept:hover { -fx-background-color: #0EA371; }
@@ -404,84 +273,17 @@
 #btn-cancel:hover { -fx-background-color: #F3F4F6; }
 #call-actions > .button { -fx-min-width: 130; }
 
-/*===== VOICE RECORD ===== */
-#voice-dialog {
-    -fx-background-color: #FFFFFF;
-    -fx-border-color: #D1D5DB;
-    -fx-border-radius: 8;
-    -fx-background-radius: 8;
-    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.2), 10, 0, 0, 2);
-}
-
-#mic-icon {
-    -fx-font-size: 48px;
-    -fx-text-fill: #EF4444;
-}
-
-#status-label {
-    -fx-font-size: 18px;
-    -fx-font-weight: bold;
-    -fx-text-fill: #1F2937;
-}
-
-#timer-label {
-    -fx-font-size: 24px;
-    -fx-font-weight: bold;
-    -fx-text-fill: #EF4444;
-}
-
-#wave-bar-0, #wave-bar-1, #wave-bar-2, #wave-bar-3, #wave-bar-4 {
-    -fx-fill: #EF4444;
-}
-
-#stop-button {
-    -fx-background-color: #EF4444;
-    -fx-text-fill: white;
-    -fx-background-radius: 50;
-    -fx-padding: 10 20;
-    -fx-font-size: 14px;
-    -fx-cursor: hand;
-}
-
-#stop-button:hover {
-    -fx-background-color: #DC2626;
-}
-
-#cancel-button {
-    -fx-background-color: #6B7280;
-    -fx-text-fill: white;
-    -fx-background-radius: 50;
-    -fx-padding: 10 20;
-    -fx-font-size: 14px;
-    -fx-cursor: hand;
-}
-
-#cancel-button:hover {
-    -fx-background-color: #4B5563;
-}
-
-#play-button {
-    -fx-background-color: #10B981;
-    -fx-text-fill: white;
-    -fx-background-radius: 50;
-    -fx-padding: 10 20;
-    -fx-font-size: 14px;
-    -fx-cursor: hand;
-}
-
-#play-button:hover {
-    -fx-background-color: #059669;
-}
-
-#send-button {
-    -fx-background-color: #3B82F6;
-    -fx-text-fill: white;
-    -fx-background-radius: 50;
-    -fx-padding: 10 20;
-    -fx-font-size: 14px;
-    -fx-cursor: hand;
-}
-
-#send-button:hover {
-    -fx-background-color: #2563EB;
-}
+/* ======================= VOICE RECORD ======================= */
+#voice-dialog { -fx-background-color: #FFFFFF; -fx-border-color: #D1D5DB; -fx-border-radius: 8; -fx-background-radius: 8; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.2), 10, 0, 0, 2); }
+#mic-icon { -fx-font-size: 48px; -fx-text-fill: #EF4444; }
+#status-label { -fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: #1F2937; }
+#timer-label { -fx-font-size: 24px; -fx-font-weight: bold; -fx-text-fill: #EF4444; }
+#wave-bar-0, #wave-bar-1, #wave-bar-2, #wave-bar-3, #wave-bar-4 { -fx-fill: #EF4444; }
+#stop-button { -fx-background-color: #EF4444; -fx-text-fill: white; -fx-background-radius: 50; -fx-padding: 10 20; -fx-font-size: 14px; -fx-cursor: hand; }
+#stop-button:hover { -fx-background-color: #DC2626; }
+#cancel-button { -fx-background-color: #6B7280; -fx-text-fill: white; -fx-background-radius: 50; -fx-padding: 10 20; -fx-font-size: 14px; -fx-cursor: hand; }
+#cancel-button:hover { -fx-background-color: #4B5563; }
+#play-button { -fx-background-color: #10B981; -fx-text-fill: white; -fx-background-radius: 50; -fx-padding: 10 20; -fx-font-size: 14px; -fx-cursor: hand; }
+#play-button:hover { -fx-background-color: #059669; }
+#send-button { -fx-background-color: #3B82F6; -fx-text-fill: white; -fx-background-radius: 50; -fx-padding: 10 20; -fx-font-size: 14px; -fx-cursor: hand; }
+#send-button:hover { -fx-background-color: #2563EB; }

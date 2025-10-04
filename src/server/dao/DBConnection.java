@@ -9,7 +9,7 @@ public class DBConnection {
 		  + "&allowPublicKeyRetrieval=true"
 		  + "&serverTimezone=UTC";
     private static final String USER = "root";
-    private static final String PASS = "11122005Long123@";
+    private static final String PASS = "";
 
     public static Connection get() throws SQLException {
         try {

@@ -9,40 +9,24 @@ import client.controller.mid.SessionHandler;
 import client.controller.mid.UIMessageHandler;
 import client.controller.mid.UtilHandler;
 import client.controller.mid.VoiceRecordHandler;
-import client.media.CallOffer;
 import client.media.LanAudioSession;
 import client.media.LanVideoSession;
-import client.media.LanVideoSession.OfferInfo;
 import client.signaling.CallSignalListener;
 import client.signaling.CallSignalingService;
 import common.Frame;
-import common.MessageType;
 import common.User;
 import javafx.application.Platform;
-import javafx.fxml.FXMLLoader;
-import javafx.geometry.Insets;
-import javafx.geometry.Pos;
 import javafx.scene.Node;
-import javafx.scene.Parent;
-import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.image.Image;
-import javafx.scene.image.ImageView;
-import javafx.scene.image.WritableImage;
 import javafx.scene.layout.*;
-import javafx.scene.media.Media;
-import javafx.scene.media.MediaPlayer;
-import javafx.scene.media.MediaView;
 import javafx.stage.Stage;
 import javafx.stage.Window;
 import server.dao.UserDAO;
 
 import java.io.BufferedOutputStream;
 import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
 import java.sql.SQLException;
-import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
@@ -82,17 +66,14 @@ public class MidController implements CallSignalListener {
 
     private final VoiceRecordHandler voiceRecordHandler = new VoiceRecordHandler();
 
-    public void bind(Label currentChatName, Label currentChatStatus,
-                     VBox messageContainer, TextField messageField, Button logoutBtn) {
-        this.currentChatName = currentChatName;
-        this.currentChatStatus = currentChatStatus;
-        this.messageContainer = messageContainer;
-        this.messageField = messageField;
-        this.logoutBtn = logoutBtn;
-
-        if (this.messageField != null) this.messageField.setOnAction(e -> onSendMessage());
-        if (this.logoutBtn != null) this.logoutBtn.setOnAction(e -> onLogout());
-    }
+    public void bind(Label currentChatName, Label currentChatStatus, VBox messageContainer, TextField messageField) {
+	this.currentChatName = currentChatName;
+	this.currentChatStatus = currentChatStatus;
+	this.messageContainer = messageContainer;
+	this.messageField = messageField;
+	
+	if (this.messageField != null) this.messageField.setOnAction(e -> onSendMessage());
+	}
 
     public void setRightController(RightController rc) { this.rightController = rc; }
     public void setCurrentUser(User user) { this.currentUser = user; }
@@ -204,11 +185,6 @@ public class MidController implements CallSignalListener {
     public void updateImageBubbleFromUrl(HBox row, String fileUrl) {
         new MediaHandler(this).updateImageBubbleFromUrl(row, fileUrl);
     }
-
-    private void onLogout() {
-        new SessionHandler(this).onLogout();
-    }
-
     private void applyStatusLabel(Label lbl, boolean online, String lastSeenIso) {
         new UIMessageHandler(this).applyStatusLabel(lbl, online, lastSeenIso);
     }

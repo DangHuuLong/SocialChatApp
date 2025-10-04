@@ -13,6 +13,7 @@ import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.shape.Rectangle;
@@ -47,6 +48,14 @@ public class HomeController {
     @FXML private VBox rightEmpty;
     @FXML private Button callBtn;
     @FXML private Button videoBtn;
+    @FXML private VBox sidebar;
+    @FXML private Label titleLabel;
+    @FXML private Button toggleSidebarBtn;
+    @FXML private Button searchIconBtn;
+    @FXML private Button toggleRightBtn;
+
+	private HBox leftHeader;
+	private Region leftHeaderSpacer;
 
     private final LeftController leftCtrl = new LeftController();
     private final MidController midCtrl = new MidController();
@@ -59,9 +68,18 @@ public class HomeController {
 
     @FXML
     private void initialize() {
-        leftCtrl.bind(chatList, searchField);
+        leftCtrl.bind(
+            sidebar,
+            chatList,
+            searchField,
+            titleLabel,
+            toggleSidebarBtn,
+            searchIconBtn,
+            logoutBtn,
+            leftHeader, leftHeaderSpacer
+        );
         rightCtrl.bind(infoName, chatStatus);
-        midCtrl.bind(currentChatName, currentChatStatus, messageContainer, messageField, logoutBtn);
+        midCtrl.bind(currentChatName, currentChatStatus, messageContainer, messageField);
         midCtrl.setRightController(rightCtrl);
 
         leftCtrl.setOnOpenConversation(user -> {
@@ -69,13 +87,12 @@ public class HomeController {
             toggleCenterEmpty(false);
             toggleRightEmpty(false);
             midCtrl.openConversation(user);
-            System.out.println("[LEFT] callback registered");
         });
 
         toggleCenterEmpty(true);
         toggleRightEmpty(true);
-        System.out.println("[INIT] setOnOpenConversation");
     }
+
 
     private void toggleCenterEmpty(boolean showEmpty) {
         centerEmpty.setVisible(showEmpty);
@@ -114,6 +131,16 @@ public class HomeController {
 
     public void reloadAll() { leftCtrl.reloadAll(); }
     public void searchUsers() { leftCtrl.searchUsers(searchField.getText()); }
+    
+    @FXML
+    private void onToggleRightPanel() {
+        boolean currentlyShown = rightStack.isManaged(); 
+        boolean nextShown = !currentlyShown;
+
+        rightStack.setVisible(nextShown);
+        rightStack.setManaged(nextShown);
+    }
+
 
     @FXML
     private void onSend() {
