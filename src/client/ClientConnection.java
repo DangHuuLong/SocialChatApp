@@ -5,23 +5,17 @@ import client.signaling.CallSignalingService;
 import common.Frame;
 import common.FrameIO;
 import common.MessageType;
-import javafx.scene.Node;
 import javafx.scene.layout.HBox;
-import javafx.application.Platform;
 
 import java.io.*;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.nio.file.Files;
-import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
-
-import javax.sound.sampled.AudioFileFormat;
-import javax.sound.sampled.AudioSystem;
 
 public class ClientConnection {
     private Socket socket;
@@ -65,13 +59,11 @@ public class ClientConnection {
     public void setMidController(MidController controller) {
         this.midController = controller;
     }
-    
+
     public void downloadFile(String fileId) throws IOException {
-        // server DOWNLOAD_FILE đọc f.body = fileId
         Frame req = new Frame(MessageType.DOWNLOAD_FILE, "", "", fileId);
         sendFrame(req);
     }
-
 
     public void startListener(Consumer<Frame> onFrame, Consumer<Exception> onError) {
         this.onFrame = onFrame;
@@ -103,6 +95,7 @@ public class ClientConnection {
                             fut.completeExceptionally(new IOException(f.body));
                         }
                         if (midController != null) {
+                            // no-op
                         }
                         continue;
                     }
@@ -143,6 +136,12 @@ public class ClientConnection {
         sendFrame(f);
     }
 
+    /** ====== NEW: delete message by id ====== */
+    public void deleteMessage(long id) throws IOException {
+        Frame f = new Frame(MessageType.DELETE_MSG, "", "", String.valueOf(id));
+        sendFrame(f);
+    }
+
     public synchronized Frame sendFileWithAck(String from, String to, File file, String mimeOrNull, String fileId, long timeoutMs)
             throws Exception {
         int retries = 3;
@@ -152,20 +151,19 @@ public class ClientConnection {
             try {
                 ensureSendableFile(file);
 
-                // mime + duration (dùng để hiển thị)
                 String mime = (mimeOrNull != null && !mimeOrNull.isBlank()) ? mimeOrNull : guessMime(file);
                 String durationVal = "--:--";
                 if (mime != null && (mime.equals("audio/wav") || mime.equals("audio/x-wav")
-                                  || mime.equals("audio/aiff") || mime.equals("audio/x-aiff"))) {
+                        || mime.equals("audio/aiff") || mime.equals("audio/x-aiff"))) {
                     try {
                         var aff = javax.sound.sampled.AudioSystem.getAudioFileFormat(file);
                         long frames = aff.getFrameLength();
                         float frameRate = aff.getFormat().getFrameRate();
                         if (frames > 0 && frameRate > 0) {
-                            int sec = (int)((frames / frameRate));
-                            durationVal = String.format("%d:%02d", sec/60, sec%60);
+                            int sec = (int) ((frames / frameRate));
+                            durationVal = String.format("%d:%02d", sec / 60, sec % 60);
                         }
-                    } catch (Exception ignored) { /* im lặng */ }
+                    } catch (Exception ignored) { }
                 }
 
                 final String fFrom = from;
@@ -175,9 +173,8 @@ public class ClientConnection {
                 final String fName = file.getName();
                 final long   fSize = file.length();
                 final String fDuration = durationVal;
-                final String localUrl = file.toURI().toString(); // file:///...
+                final String localUrl = file.toURI().toString();
 
-                // Vẽ bubble người gửi trên FX thread (không có nhãn “Sending…”)
                 if (midController != null) {
                     javafx.application.Platform.runLater(() -> {
                         try { midController.showOutgoingFile(fName, fMime, fSize, fFileId, fDuration); }
@@ -185,15 +182,12 @@ public class ClientConnection {
                     });
                 }
 
-                // chuẩn bị ACK future
                 CompletableFuture<Frame> fut = new CompletableFuture<>();
                 pendingAcks.put(fFileId, fut);
 
-                // Gửi META
                 Frame meta = Frame.fileMeta(fFrom, fTo, fName, fMime, fFileId, fSize);
                 sendFrame(meta);
 
-                // Gửi CHUNK
                 try (InputStream fis = new BufferedInputStream(new FileInputStream(file))) {
                     byte[] buf = new byte[Frame.CHUNK_SIZE];
                     int n, seq = 0;
@@ -207,11 +201,8 @@ public class ClientConnection {
                     }
                 }
 
-                // Chờ ACK
-             // ClientConnection.sendFileWithAck(...)
                 Frame ack = fut.get(timeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS);
 
-                // Sau ACK: gắn media cho bubble người gửi
                 if (midController != null) {
                     javafx.application.Platform.runLater(() -> {
                         try {
@@ -234,7 +225,6 @@ public class ClientConnection {
                     });
                 }
 
-
                 return ack;
 
             } catch (java.util.concurrent.TimeoutException te) {
@@ -252,14 +242,12 @@ public class ClientConnection {
         throw lastEx != null ? lastEx : new IOException("Failed to send file after " + retries + " attempts");
     }
 
-
-
     public synchronized void sendAudio(String from, String to, byte[] audioBytes, String codec, int sampleRate, int durationSec)
             throws IOException {
         if (audioBytes == null || audioBytes.length == 0) throw new IOException("Empty audio");
         if (durationSec > Frame.MAX_AUDIO_SECONDS) throw new IOException("Audio too long (>30s)");
 
-        String audioId = UUID.randomUUID().toString();
+        String audioId = java.util.UUID.randomUUID().toString();
 
         Frame meta = Frame.audioMeta(from, to, codec, sampleRate, durationSec, audioId, audioBytes.length);
         sendFrame(meta);
@@ -285,7 +273,7 @@ public class ClientConnection {
                 if (audioBytes == null || audioBytes.length == 0) throw new IOException("Empty audio");
                 if (durationSec > Frame.MAX_AUDIO_SECONDS) throw new IOException("Audio too long (>30s)");
 
-                audioId = UUID.randomUUID().toString();
+                audioId = java.util.UUID.randomUUID().toString();
                 CompletableFuture<Frame> fut = new CompletableFuture<>();
                 pendingAcks.put(audioId, fut);
 
@@ -304,6 +292,7 @@ public class ClientConnection {
 
                 Frame ack = fut.get(timeoutMs, TimeUnit.MILLISECONDS);
                 if (midController != null) {
+                    // no-op
                 }
                 return ack;
             } catch (IOException e) {
@@ -314,11 +303,13 @@ public class ClientConnection {
             } catch (TimeoutException te) {
                 pendingAcks.remove(audioId);
                 if (midController != null) {
+                    // no-op
                 }
                 throw te;
             }
         }
         if (midController != null) {
+            // no-op
         }
         throw lastEx != null ? lastEx : new IOException("Failed to send audio after " + retries + " attempts");
     }
@@ -340,7 +331,7 @@ public class ClientConnection {
         }
         String name = f.getName().toLowerCase();
         if (name.endsWith(".png") || name.endsWith(".jpg") || name.endsWith(".jpeg") ||
-            name.endsWith(".gif") || name.endsWith(".bmp") || name.endsWith(".webp")) {
+                name.endsWith(".gif") || name.endsWith(".bmp") || name.endsWith(".webp")) {
             return "image/" + name.substring(name.lastIndexOf('.') + 1);
         }
         if (name.endsWith(".mp3")) return "audio/mpeg";

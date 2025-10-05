@@ -46,7 +46,8 @@ public enum MessageType {
     CALL_ANSWER ((byte)27),   // body=answer JSON
     CALL_ICE    ((byte)28),   // body=candidate JSON/b64
     CALL_OFFLINE((byte)29),   // notify caller khi callee offline
-    DOWNLOAD_FILE((byte)30); 
+    DOWNLOAD_FILE((byte)30),
+    DELETE_MSG((byte)31); 
     public final byte id;
     MessageType(byte id){ this.id = id; }
 

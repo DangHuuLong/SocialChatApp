@@ -88,6 +88,7 @@ public class HomeController {
             toggleRightEmpty(false);
             midCtrl.openConversation(user);
         });
+        leftCtrl.setOnLogout(this::performLogout);  
 
         toggleCenterEmpty(true);
         toggleRightEmpty(true);
@@ -295,8 +296,7 @@ public class HomeController {
         }
     }
 
-    @FXML
-    private void onLogout() {
+    private void performLogout() {
         try {
             if (currentUser != null) {
                 UserDAO.setOnline(currentUser.getId(), false);
@@ -323,6 +323,7 @@ public class HomeController {
             e.printStackTrace();
         }
     }
+
 
     private void showErrorAlert(String message) {
         Alert alert = new Alert(Alert.AlertType.ERROR);

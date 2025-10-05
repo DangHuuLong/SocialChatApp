@@ -201,6 +201,20 @@
 #outgoing-video Button { -fx-background-color: rgba(255,255,255,0.25); -fx-text-fill: -fx-out-text; }
 #incoming-video Slider, #outgoing-video Slider { -fx-pref-width: 220; }
 
+.msg-menu {
+  -fx-background-color: transparent;
+  -fx-background-radius: 6;
+  -fx-padding: 2 6 2 6;
+  -fx-cursor: hand;
+  -fx-text-fill: #6B7280;
+  -fx-font-weight: bold;
+}
+.msg-menu:hover {
+  -fx-background-color: rgba(0,0,0,0.06);
+  -fx-text-fill: #111827;
+}
+
+
 /* ======================= ACCORDION (RIGHT) ======================= */
 .accordion { -fx-background-color: transparent; }
 .menu-pane {

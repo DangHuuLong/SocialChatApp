@@ -5,7 +5,6 @@ import client.controller.mid.CallHandler;
 import client.controller.mid.FileHandler;
 import client.controller.mid.MediaHandler;
 import client.controller.mid.MessageHandler;
-import client.controller.mid.SessionHandler;
 import client.controller.mid.UIMessageHandler;
 import client.controller.mid.UtilHandler;
 import client.controller.mid.VoiceRecordHandler;
@@ -16,6 +15,7 @@ import client.signaling.CallSignalingService;
 import common.Frame;
 import common.User;
 import javafx.application.Platform;
+import javafx.beans.value.ChangeListener;
 import javafx.scene.Node;
 import javafx.scene.control.*;
 import javafx.scene.image.Image;
@@ -24,14 +24,13 @@ import javafx.stage.Stage;
 import javafx.stage.Window;
 import server.dao.UserDAO;
 
+import javax.sound.sampled.AudioFormat;
 import java.io.BufferedOutputStream;
 import java.io.File;
 import java.sql.SQLException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
-
-import javax.sound.sampled.AudioFormat;
 
 public class MidController implements CallSignalListener {
     private Label currentChatName;
@@ -56,6 +55,8 @@ public class MidController implements CallSignalListener {
     private LanVideoSession videoSession;
     private LanAudioSession audioSession;
 
+    private ChangeListener<Number> autoScrollListener;
+
     private final Map<String, List<Frame>> pendingFileEvents = new ConcurrentHashMap<>();
     private final Map<String, String> fileIdToName = new ConcurrentHashMap<>();
     private final Map<String, String> fileIdToMime = new ConcurrentHashMap<>();
@@ -65,15 +66,17 @@ public class MidController implements CallSignalListener {
     private final Map<String, File> dlPath = new ConcurrentHashMap<>();
 
     private final VoiceRecordHandler voiceRecordHandler = new VoiceRecordHandler();
+    
+    private final ArrayDeque<HBox> pendingOutgoingTexts = new ArrayDeque<>();
 
     public void bind(Label currentChatName, Label currentChatStatus, VBox messageContainer, TextField messageField) {
-	this.currentChatName = currentChatName;
-	this.currentChatStatus = currentChatStatus;
-	this.messageContainer = messageContainer;
-	this.messageField = messageField;
-	
-	if (this.messageField != null) this.messageField.setOnAction(e -> onSendMessage());
-	}
+        this.currentChatName = currentChatName;
+        this.currentChatStatus = currentChatStatus;
+        this.messageContainer = messageContainer;
+        this.messageField = messageField;
+
+        if (this.messageField != null) this.messageField.setOnAction(e -> onSendMessage());
+    }
 
     public void setRightController(RightController rc) { this.rightController = rc; }
     public void setCurrentUser(User user) { this.currentUser = user; }
@@ -113,6 +116,9 @@ public class MidController implements CallSignalListener {
             }
             messageContainer.getChildren().clear();
         }
+
+        enableAutoScroll();
+
         if (connection != null && connection.isAlive()) {
             try {
                 connection.history(currentUser.getUsername(), u.getUsername(), 50);
@@ -131,11 +137,20 @@ public class MidController implements CallSignalListener {
         new MessageHandler(this).handleServerFrame(f);
     }
 
-    public HBox findRowByUserData(String fid) {
+    public HBox findRowByUserData(String id) {
+        if (id == null) return null;
         for (Node n : messageContainer.getChildren()) {
-            if (n instanceof HBox h && fid.equals(h.getUserData())) return h;
+            if (n instanceof HBox h) {
+                Object ud = h.getUserData();
+                if (ud != null && id.equals(String.valueOf(ud))) return h;
+            }
         }
         return null;
+    }
+
+    public boolean removeMessageById(String id) {
+        HBox row = findRowByUserData(id);
+        return row != null && messageContainer.getChildren().remove(row);
     }
 
     public void showErrorAlert(String message) {
@@ -150,24 +165,66 @@ public class MidController implements CallSignalListener {
         new MessageHandler(this).onSendMessage();
     }
 
+    private ScrollPane findMessageScrollPane() {
+        if (messageContainer == null) return null;
+        Node p = messageContainer.getParent();
+        while (p != null && !(p instanceof ScrollPane)) p = p.getParent();
+        return (p instanceof ScrollPane sp) ? sp : null;
+    }
+
+    private void enableAutoScroll() {
+        ScrollPane sp = findMessageScrollPane();
+        if (sp == null) return;
+
+        if (autoScrollListener != null) {
+            messageContainer.heightProperty().removeListener(autoScrollListener);
+        }
+
+        autoScrollListener = (obs, oldV, newV) -> Platform.runLater(() -> {
+            sp.layout();
+            sp.setVvalue(1.0);
+        });
+        messageContainer.heightProperty().addListener(autoScrollListener);
+
+        Platform.runLater(() -> {
+            sp.layout();
+            sp.setVvalue(1.0);
+        });
+    }
+    
+    public void enqueuePendingOutgoing(HBox row) {
+        if (row != null) pendingOutgoingTexts.addLast(row);
+    }
+    public void tagNextPendingOutgoing(String id) {
+        HBox row = pendingOutgoingTexts.pollFirst();
+        if (row != null && id != null) row.setUserData(id);
+    }
+
     public HBox addTextMessage(String text, boolean incoming) {
-        return new UIMessageHandler(this).addTextMessage(text, incoming);
+        return addTextMessage(text, incoming, null);
     }
-
     public HBox addImageMessage(Image img, String caption, boolean incoming) {
-        return new UIMessageHandler(this).addImageMessage(img, caption, incoming);
+        return addImageMessage(img, caption, incoming, null);
     }
-
     public HBox addFileMessage(String filename, String meta, boolean incoming) {
-        return new UIMessageHandler(this).addFileMessage(filename, meta, incoming);
+        return addFileMessage(filename, meta, incoming, null);
     }
 
     public HBox addVoiceMessage(String duration, boolean incoming, String fileId) {
         return new UIMessageHandler(this).addVoiceMessage(duration, incoming, fileId);
     }
-
     public HBox addVideoMessage(String filename, String meta, boolean incoming, String fileId) {
         return new UIMessageHandler(this).addVideoMessage(filename, meta, incoming, fileId);
+    }
+
+    public HBox addTextMessage(String text, boolean incoming, String messageId) {
+        return new UIMessageHandler(this).addTextMessage(text, incoming, messageId);
+    }
+    public HBox addImageMessage(Image img, String caption, boolean incoming, String messageId) {
+        return new UIMessageHandler(this).addImageMessage(img, caption, incoming, messageId);
+    }
+    public HBox addFileMessage(String filename, String meta, boolean incoming, String messageId) {
+        return new UIMessageHandler(this).addFileMessage(filename, meta, incoming, messageId);
     }
 
     public void showOutgoingFile(String filename, String mime, long bytes, String fileId, String duration) {
@@ -185,6 +242,7 @@ public class MidController implements CallSignalListener {
     public void updateImageBubbleFromUrl(HBox row, String fileUrl) {
         new MediaHandler(this).updateImageBubbleFromUrl(row, fileUrl);
     }
+
     private void applyStatusLabel(Label lbl, boolean online, String lastSeenIso) {
         new UIMessageHandler(this).applyStatusLabel(lbl, online, lastSeenIso);
     }
@@ -227,47 +285,38 @@ public class MidController implements CallSignalListener {
     public void onInvite(String fromUser, String callId) {
         new CallHandler(this).onInvite(fromUser, callId);
     }
-
     @Override
     public void onAccept(String fromUser, String callId) {
         new CallHandler(this).onAccept(fromUser, callId);
     }
-
     @Override
     public void onReject(String fromUser, String callId) {
         new CallHandler(this).onReject(fromUser, callId);
     }
-
     @Override
     public void onCancel(String fromUser, String callId) {
         new CallHandler(this).onCancel(fromUser, callId);
     }
-
     @Override
     public void onBusy(String fromUser, String callId) {
         new CallHandler(this).onBusy(fromUser, callId);
     }
-
     @Override
     public void onEnd(String fromUser, String callId) {
         new CallHandler(this).onEnd(fromUser, callId);
     }
-
     @Override
     public void onOffline(String toUser, String callId) {
         new CallHandler(this).onOffline(toUser, callId);
     }
-
     @Override
     public void onOffer(String fromUser, String callId, String sdpJson) {
         new CallHandler(this).onOffer(fromUser, callId, sdpJson);
     }
-
     @Override
     public void onAnswer(String fromUser, String callId, String sdpJson) {
         new CallHandler(this).onAnswer(fromUser, callId, sdpJson);
     }
-
     @Override
     public void onIce(String from, String id, String c) {
         new CallHandler(this).onIce(from, id, c);

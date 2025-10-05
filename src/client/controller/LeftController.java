@@ -34,6 +34,7 @@ public class LeftController {
     private Button toggleSidebarBtn;
     private Button searchIconBtn;
     private Button logoutBtn;
+    private Runnable onLogout;  
 
     private final Map<Integer, Label> lastLabels = new HashMap<>();
     private final Map<Integer, User> idToUser = new HashMap<>();
@@ -79,9 +80,17 @@ public class LeftController {
                 Platform.runLater(() -> { if (searchField != null) searchField.requestFocus(); });
             });
         }
+        
+        if (this.logoutBtn != null) {
+            this.logoutBtn.setOnAction(e -> { if (onLogout != null) onLogout.run(); }); // <-- thêm
+        }
 
         collapsed.addListener((o,ov,nv) -> applyCollapsedUI(nv));
         applyCollapsedUI(collapsed.get());
+    }
+    
+    public void setOnLogout(Runnable cb) {         
+        this.onLogout = cb;
     }
 
     public void setCurrentUser(User user) { this.currentUser = user; }
@@ -248,6 +257,11 @@ public class LeftController {
         }
 
         if (chatList != null) chatList.requestLayout();
+        
+        if (logoutBtn != null) {
+            logoutBtn.setVisible(true);    // <-- thêm
+            logoutBtn.setManaged(true);    // <-- thêm
+        }
     }
 
 

@@ -1,8 +1,6 @@
 package server.dao;
 
 import common.Frame;
-import common.MessageType;
-
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -15,35 +13,40 @@ public class MessageDao {
         this.conn = conn;
     }
 
-    public void saveQueued(Frame f) throws SQLException {
+    public long saveQueuedReturnId(Frame f) throws SQLException {
         String sql = "INSERT INTO messages(sender, recipient, body, status) VALUES(?,?,?, 'queued')";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+        try (PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
             ps.setString(1, f.sender);
             ps.setString(2, f.recipient);
             ps.setString(3, f.body);
             ps.executeUpdate();
+            try (ResultSet rs = ps.getGeneratedKeys()) {
+                if (rs.next()) return rs.getLong(1);
+            }
         }
+        return 0L;
+    }
+
+    public long saveSentReturnId(Frame f) throws SQLException {
+        String sql = "INSERT INTO messages(sender, recipient, body, status) VALUES(?,?,?, 'delivered')";
+        try (PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+            ps.setString(1, f.sender);
+            ps.setString(2, f.recipient);
+            ps.setString(3, f.body);
+            ps.executeUpdate();
+            try (ResultSet rs = ps.getGeneratedKeys()) {
+                if (rs.next()) return rs.getLong(1);
+            }
+        }
+        return 0L;
+    }
+
+    public void saveQueued(Frame f) throws SQLException {
+        saveQueuedReturnId(f);
     }
 
     public void saveSent(Frame f) throws SQLException {
-        String sql = "INSERT INTO messages(sender, recipient, body, status) VALUES(?,?,?, 'delivered')";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, f.sender);
-            ps.setString(2, f.recipient);
-            ps.setString(3, f.body);
-            ps.executeUpdate();
-        }
-    }
-
-    public void saveFileEvent(Frame f) throws SQLException {
-        String sql = "INSERT INTO messages(sender, recipient, body, status, type) VALUES(?,?,?, 'delivered', ?)";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, f.sender);
-            ps.setString(2, f.recipient);
-            ps.setString(3, f.body);
-            ps.setString(4, f.type == MessageType.FILE_EVT ? "file" : "audio");
-            ps.executeUpdate();
-        }
+        saveSentReturnId(f);
     }
 
     public List<Frame> loadQueued(String recipient) throws SQLException {
@@ -55,7 +58,8 @@ public class MessageDao {
             while (rs.next()) {
                 String sender = rs.getString("sender");
                 String body = rs.getString("body");
-                Frame f = new Frame(MessageType.DM, sender, recipient, body);
+                Frame f = new Frame(common.MessageType.DM, sender, recipient, body);
+                f.transferId = String.valueOf(rs.getLong("id"));
                 out.add(f);
                 markDelivered(rs.getLong("id"));
             }
@@ -72,20 +76,21 @@ public class MessageDao {
     }
 
     public static class HistoryRow {
-        public final String sender, recipient, body, type;
+        public final long id;
+        public final String sender, recipient, body;
         public final Timestamp createdAt;
-        public HistoryRow(String s, String r, String b, String t, Timestamp c) {
+        public HistoryRow(long id, String s, String r, String b, Timestamp c) {
+            this.id = id;
             this.sender = s;
             this.recipient = r;
             this.body = b;
-            this.type = (t != null) ? t : "text"; // Mặc định là "text" nếu type null
             this.createdAt = c;
         }
     }
 
     public List<HistoryRow> loadConversation(String a, String b, int limit) throws SQLException {
         String sql = """
-            SELECT sender, recipient, body, COALESCE(type, 'text') AS type, created_at
+            SELECT id, sender, recipient, body, created_at
             FROM messages
             WHERE (sender=? AND recipient=?) OR (sender=? AND recipient=?)
             ORDER BY id DESC
@@ -101,15 +106,52 @@ public class MessageDao {
             ResultSet rs = ps.executeQuery();
             while (rs.next()) {
                 out.add(new HistoryRow(
+                    rs.getLong("id"),
                     rs.getString("sender"),
                     rs.getString("recipient"),
                     rs.getString("body"),
-                    rs.getString("type"), // Sử dụng type đã được COALESCE
                     rs.getTimestamp("created_at")
                 ));
             }
         }
         Collections.reverse(out);
         return out;
+    }
+
+    public boolean deleteById(long id, String requester) throws SQLException {
+        String checkSql = "SELECT sender FROM messages WHERE id=?";
+        String sender = null;
+        try (PreparedStatement ps = conn.prepareStatement(checkSql)) {
+            ps.setLong(1, id);
+            ResultSet rs = ps.executeQuery();
+            if (rs.next()) sender = rs.getString("sender");
+        }
+        if (sender == null || !sender.equals(requester)) return false;
+
+        try (PreparedStatement ps = conn.prepareStatement("DELETE FROM messages WHERE id=?")) {
+            ps.setLong(1, id);
+            return ps.executeUpdate() > 0;
+        }
+    }
+
+    public String deleteByIdReturningPeer(long id, String requester) throws SQLException {
+        String sqlSel = "SELECT sender, recipient FROM messages WHERE id=?";
+        String sender = null, recipient = null;
+        try (PreparedStatement ps = conn.prepareStatement(sqlSel)) {
+            ps.setLong(1, id);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    sender = rs.getString("sender");
+                    recipient = rs.getString("recipient");
+                }
+            }
+        }
+        if (sender == null || !sender.equals(requester)) return null;
+
+        try (PreparedStatement ps = conn.prepareStatement("DELETE FROM messages WHERE id=?")) {
+            ps.setLong(1, id);
+            int n = ps.executeUpdate();
+            return (n > 0) ? recipient : null;
+        }
     }
 }

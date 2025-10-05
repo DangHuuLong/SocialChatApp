@@ -2,20 +2,15 @@ package client.controller.mid;
 
 import common.Frame;
 import common.MessageType;
-import common.User;
 import javafx.application.Platform;
 import javafx.scene.layout.HBox;
-import server.dao.UserDAO;
-
 import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.sql.SQLException;
 import java.util.ArrayList;
 import javafx.scene.image.Image;
 import javafx.scene.image.WritableImage;
-
 import client.controller.MidController;
 import client.controller.mid.UtilHandler.MediaKind;
 
@@ -35,7 +30,7 @@ public class MessageHandler {
                 String sender = f.sender;
                 String body = f.body;
                 if (openPeer != null && openPeer.equals(sender)) {
-                    controller.addTextMessage(body, true);
+                    controller.addTextMessage(body, true, f.transferId);
                 }
             }
             case HISTORY -> {
@@ -47,12 +42,12 @@ public class MessageHandler {
                         String sender = payload.substring(0, p);
                         String body = payload.substring(p + 2);
                         if (openPeer != null && openPeer.equals(sender)) {
-                            controller.addTextMessage(body, true);
+                            controller.addTextMessage(body, true, f.transferId);
                         }
                     }
                 } else if (line.startsWith("[HIST OUT]")) {
                     String body = line.substring(10).trim();
-                    controller.addTextMessage(body, false);
+                    controller.addTextMessage(body, false, f.transferId);
                 }
             }
             case FILE_EVT, AUDIO_EVT -> {
@@ -93,7 +88,6 @@ public class MessageHandler {
                     }
                 } else {
                     controller.getPendingFileEvents().computeIfAbsent(from, k -> new ArrayList<>()).add(f);
-                    System.out.println("[DEBUG] FILE_EVT queued for from=" + from);
                 }
             }
             case FILE_META -> {
@@ -109,7 +103,6 @@ public class MessageHandler {
                     BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(tmp));
                     controller.getDlPath().put(fid, tmp);
                     controller.getDlOut().put(fid, bos);
-                    System.out.println("[DL] open temp " + tmp.getAbsolutePath());
                 } catch (Exception ex) {
                     System.err.println("[DL] open failed: " + ex.getMessage());
                 }
@@ -143,7 +136,7 @@ public class MessageHandler {
                                         case AUDIO -> controller.updateVoiceBubbleFromUrl(row, fileUrl);
                                         case VIDEO -> controller.updateVideoBubbleFromUrl(row, fileUrl);
                                         case IMAGE -> controller.updateImageBubbleFromUrl(row, fileUrl);
-                                        default -> { /* file thường: có thể thêm nút mở */ }
+                                        default -> {}
                                     }
                                 } catch (Exception ex) {
                                     System.err.println("[UI] attach player failed: " + ex.getMessage());
@@ -153,9 +146,16 @@ public class MessageHandler {
                     }
                 }
             }
+            case DELETE_MSG -> {
+                String id = f.transferId;
+                if (id != null) {
+                    Platform.runLater(() -> controller.removeMessageById(id));
+                }
+            }
             case ACK -> {
-                if (f.transferId != null) {
-                    // không làm gì ở đây; ClientConnection sau ACK đã gọi update*FromUrl qua Platform.runLater rồi
+                if (f.transferId != null && f.body != null &&
+                    (f.body.startsWith("OK DM") || f.body.startsWith("OK QUEUED"))) {
+                    controller.tagNextPendingOutgoing(f.transferId);
                 }
             }
             case ERROR -> Platform.runLater(() -> controller.showErrorAlert("Lỗi: " + f.body));
@@ -176,7 +176,10 @@ public class MessageHandler {
                 Platform.runLater(() -> controller.showErrorAlert("Gửi tin nhắn thất bại: " + ioe.getMessage()));
             }
         }
-        controller.addTextMessage(text, false);
+
+        HBox row = controller.addTextMessage(text, false); 
+        controller.enqueuePendingOutgoing(row);           
         controller.getMessageField().clear();
     }
+
 }

@@ -14,7 +14,6 @@ import java.util.Arrays;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.Collections;
 
 public class ClientHandler implements Runnable {
     private final Socket socket;
@@ -40,14 +39,14 @@ public class ClientHandler implements Runnable {
     private BufferedOutputStream upOut;
 
     public ClientHandler(Socket socket,
-            Set<ClientHandler> clients,
-            Map<String, ClientHandler> online,
-            MessageDao messageDao) {
-	this.socket = socket;
-	this.clients = clients;             // dùng set gốc (set này đã được tạo synchronized ở server)
-	this.online = online;               // ✅ dùng chung map online
-	this.messageDao = messageDao;
-	}
+                         Set<ClientHandler> clients,
+                         Map<String, ClientHandler> online,
+                         MessageDao messageDao) {
+        this.socket = socket;
+        this.clients = clients;
+        this.online = online;
+        this.messageDao = messageDao;
+    }
 
     @Override
     public void run() {
@@ -74,6 +73,7 @@ public class ClientHandler implements Runnable {
                     case CALL_INVITE, CALL_ACCEPT, CALL_REJECT,
                          CALL_CANCEL, CALL_BUSY, CALL_END,
                          CALL_OFFER, CALL_ANSWER, CALL_ICE -> handleCall(f);
+                    case DELETE_MSG -> handleDeleteMessage(f);
                     case DOWNLOAD_FILE -> {
                         String fileId = f.body;
                         File file = new File(UPLOAD_DIR, sanitizeFilename(fileId));
@@ -108,9 +108,9 @@ public class ClientHandler implements Runnable {
                     default -> System.out.println("[SERVER] Unknown frame: " + f.type);
                 }
             }
-        } catch (java.net.SocketException se) {
+        } catch (SocketException se) {
             System.out.println("⬅ Client disconnected: " + socketSafe() + " (" + se.getMessage() + ")");
-        } catch (java.io.EOFException eof) {
+        } catch (EOFException eof) {
             System.out.println("⬅ Client disconnected: " + socketSafe() + " (EOF)");
         } catch (IOException e) {
             System.err.println("[SERVER] IO error: " + e.getMessage());
@@ -136,7 +136,7 @@ public class ClientHandler implements Runnable {
         try {
             var pending = messageDao.loadQueued(username);
             for (var m : pending) {
-                sendFrame(Frame.dm(m.sender, username, m.body));
+                sendFrame(m); // m.transferId đã là id DB
             }
             if (!pending.isEmpty())
                 sendFrame(Frame.ack("Delivered " + pending.size() + " offline messages"));
@@ -155,23 +155,53 @@ public class ClientHandler implements Runnable {
         }
 
         try {
-            messageDao.saveSent(f);
+            long id;
+            ClientHandler target = online.get(to);
+            if (target != null) {
+                id = messageDao.saveSentReturnId(f);
+                f.transferId = String.valueOf(id);
+                target.sendFrame(f); // gửi cho người nhận kèm id
+                Frame ack = Frame.ack("OK DM");
+                ack.transferId = String.valueOf(id); // trả id cho người gửi để map UI
+                sendFrame(ack);
+            } else {
+                id = messageDao.saveQueuedReturnId(f);
+                Frame ack = Frame.ack("OK QUEUED");
+                ack.transferId = String.valueOf(id);
+                sendFrame(ack);
+            }
         } catch (SQLException e) {
+            sendFrame(Frame.error("DM_SAVE_FAIL"));
             e.printStackTrace();
         }
+    }
 
-        ClientHandler target = online.get(to);
-        if (target != null) {
-            target.sendFrame(f);
-            sendFrame(Frame.ack("OK DM"));
-        } else {
-            try {
-                messageDao.saveQueued(f);
-                sendFrame(Frame.ack("OK QUEUED"));
-            } catch (SQLException e) {
-                sendFrame(Frame.error("QUEUE_FAIL"));
-                e.printStackTrace();
+    /* ================= DELETE ================= */
+    private void handleDeleteMessage(Frame f) {
+        try {
+            long id = parseLongSafe(f.body, 0L);
+            if (id <= 0) {
+                sendFrame(Frame.error("BAD_ID"));
+                return;
             }
+            String peer = messageDao.deleteByIdReturningPeer(id, username);
+            if (peer == null) {
+                sendFrame(Frame.error("DENIED_OR_NOT_FOUND"));
+                return;
+            }
+
+            Frame ack = Frame.ack("OK DELETE");
+            ack.transferId = String.valueOf(id);
+            sendFrame(ack);
+
+            Frame evt = new Frame(MessageType.DELETE_MSG, username, peer, "");
+            evt.transferId = String.valueOf(id);
+            ClientHandler peerHandler = online.get(peer);
+            if (peerHandler != null) {
+                peerHandler.sendFrame(evt);
+            }
+        } catch (Exception e) {
+            sendFrame(Frame.error("DELETE_FAIL"));
         }
     }
 
@@ -188,7 +218,9 @@ public class ClientHandler implements Runnable {
                 String txt = incoming
                         ? "[HIST IN] " + r.sender + ": " + r.body
                         : "[HIST OUT] " + r.body;
-                sendFrame(new Frame(MessageType.HISTORY, r.sender, r.recipient, txt));
+                Frame hist = new Frame(MessageType.HISTORY, r.sender, r.recipient, txt);
+                hist.transferId = String.valueOf(r.id);
+                sendFrame(hist);
             }
             sendFrame(Frame.ack("OK HISTORY " + rows.size()));
         } catch (SQLException e) {
@@ -214,7 +246,6 @@ public class ClientHandler implements Runnable {
                 if (mime == null || mime.isBlank()) mime = "application/octet-stream";
                 if (size > Frame.MAX_FILE_BYTES) throw new IOException("file too large");
 
-                // reset upload state
                 if (upOut != null) { try { upOut.close(); } catch (Exception ignore) {} }
                 upFileId = fid;
                 upToUser = to;
@@ -226,7 +257,7 @@ public class ClientHandler implements Runnable {
 
                 if (!UPLOAD_DIR.exists()) UPLOAD_DIR.mkdirs();
                 File outFile = new File(UPLOAD_DIR, sanitizeFilename(fid));
-                fileNameMap.put(fid, name); // Lưu ánh xạ
+                fileNameMap.put(fid, name);
                 upOut = new BufferedOutputStream(new FileOutputStream(outFile));
 
                 System.out.println("[SERVER] FILE META " + body);
@@ -432,21 +463,6 @@ public class ClientHandler implements Runnable {
         String safe = name.replaceAll("[\\r\\n\\t]", "").replaceAll("[<>:\"|?*]", "_");
         if (safe.equals(".") || safe.equals("..") || safe.isBlank()) safe = "file";
         return safe;
-    }
-
-    private File uniquePath(String name) {
-        if (!UPLOAD_DIR.exists()) UPLOAD_DIR.mkdirs();
-        File f = new File(UPLOAD_DIR, name);
-        if (!f.exists()) return f;
-        String base = name, ext = "";
-        int dot = name.lastIndexOf('.');
-        if (dot >= 0) { base = name.substring(0, dot); ext = name.substring(dot); }
-        int i = 1;
-        while (true) {
-            File g = new File(UPLOAD_DIR, base + "-" + i + ext);
-            if (!g.exists()) return g;
-            i++;
-        }
     }
 
     /* ================= CALL ================= */
