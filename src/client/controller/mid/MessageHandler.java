@@ -152,6 +152,14 @@ public class MessageHandler {
                     Platform.runLater(() -> controller.removeMessageById(id));
                 }
             }
+            case EDIT_MSG -> {
+                String id = f.transferId;
+                String newBody = (f.body == null) ? "" : f.body;
+                if (id != null) {
+                    Platform.runLater(() -> controller.updateTextBubbleById(id, newBody));
+                }
+            }
+
             case ACK -> {
                 if (f.transferId != null && f.body != null &&
                     (f.body.startsWith("OK DM") || f.body.startsWith("OK QUEUED"))) {

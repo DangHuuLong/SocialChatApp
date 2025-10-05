@@ -136,11 +136,17 @@ public class ClientConnection {
         sendFrame(f);
     }
 
-    /** ====== NEW: delete message by id ====== */
     public void deleteMessage(long id) throws IOException {
         Frame f = new Frame(MessageType.DELETE_MSG, "", "", String.valueOf(id));
         sendFrame(f);
     }
+    
+    public void editMessage(long id, String from, String to, String newBody) throws IOException {
+        Frame f = new Frame(MessageType.EDIT_MSG, from, to, newBody);
+        f.transferId = String.valueOf(id);
+        sendFrame(f);
+    }
+
 
     public synchronized Frame sendFileWithAck(String from, String to, File file, String mimeOrNull, String fileId, long timeoutMs)
             throws Exception {

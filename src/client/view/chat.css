@@ -134,6 +134,82 @@
 }
 .send-btn:hover { -fx-background-color: #0F6FDE; }
 
+.button.msg-menu {
+  -fx-background-color: transparent;
+  -fx-text-fill: -fx-accent;
+  -fx-font-size: 14px;
+  -fx-padding: 2 6 2 6;
+}
+.button.msg-menu:hover {
+  -fx-background-color: rgba(0,0,0,0.06);
+  -fx-background-radius: 6;
+}
+
+/* Context menu (nhẹ, không chói) */
+.context-menu.msg-context {
+  -fx-background-color: white;
+  -fx-background-radius: 8;
+  -fx-background-insets: 0;
+  -fx-padding: 6 4;
+  -fx-effect: dropshadow(gaussian, rgba(0,0,0,.20), 12, 0.2, 0, 2);
+}
+
+/* Base cho tất cả menu items */
+.menu-item.msg-context-item,
+.menu-item.msg-context-item-danger {
+  -fx-padding: 6 12;
+  -fx-background-color: transparent;
+}
+
+/* Chữ “bình thường” */
+.menu-item.msg-context-item .label {
+  -fx-font-size: 12px;
+  -fx-text-fill: #111827; /* đen xám */
+}
+
+/* Chữ “nguy hiểm” */
+.menu-item.msg-context-item-danger .label {
+  -fx-font-size: 12px;
+  -fx-text-fill: #DC2626; /* đỏ hơi trầm */
+}
+
+/* Hover + Focused/Armed – chỉ nền xám rất nhẹ, KHÔNG đổi sang xanh/đỏ chói */
+.menu-item.msg-context-item:hover,
+.menu-item.msg-context-item:focused,
+.menu-item.msg-context-item:armed {
+  -fx-background-color: rgba(0,0,0,0.06);
+  -fx-background-radius: 6;
+}
+.menu-item.msg-context-item:hover .label,
+.menu-item.msg-context-item:focused .label,
+.menu-item.msg-context-item:armed .label {
+  -fx-text-fill: #111827;
+}
+
+.menu-item.msg-context-item-danger:hover,
+.menu-item.msg-context-item-danger:focused,
+.menu-item.msg-context-item-danger:armed {
+  -fx-background-color: rgba(220,38,38,0.06); /* xám-đỏ rất nhẹ */
+  -fx-background-radius: 6;
+}
+.menu-item.msg-context-item-danger:hover .label,
+.menu-item.msg-context-item-danger:focused .label,
+.menu-item.msg-context-item-danger:armed .label {
+  -fx-text-fill: #B91C1C; /* đỏ đậm hơn 1 chút */
+}
+
+/* Dialog chỉnh sửa */
+.dialog-pane.msg-edit-dialog {
+  -fx-background-color: white;
+  -fx-background-radius: 12;
+}
+.dialog-pane.msg-edit-dialog .header-panel { -fx-padding: 6 12; }
+.dialog-pane.msg-edit-dialog .content { -fx-padding: 12; }
+.dialog-pane.msg-edit-dialog .button-bar .button {
+  -fx-background-radius: 8;
+}
+
+
 /* ======================= RIGHT PANEL ======================= */
 .info-panel {}
 .info-header { -fx-padding: 8 0 4 0; }

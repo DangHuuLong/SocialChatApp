@@ -192,6 +192,33 @@ public class MidController implements CallSignalListener {
         });
     }
     
+    public void updateTextBubbleById(String id, String newText) {
+        HBox row = findRowByUserData(id);
+        if (row == null) return;
+        Node bubble = extractBubble(row);
+        if (!(bubble instanceof VBox vb)) return;
+        // Chỉ áp dụng cho bubble text
+        String bubbleId = (vb).getId();
+        if (!"incoming-text".equals(bubbleId) && !"outgoing-text".equals(bubbleId)) return;
+
+        for (Node n : vb.getChildren()) {
+            if (n instanceof Label lbl) {
+                lbl.setText(newText);
+                break;
+            }
+        }
+    }
+
+    private Node extractBubble(HBox row) {
+        if (row.getChildren().isEmpty()) return null;
+        Node first = row.getChildren().get(0);
+        Node last  = row.getChildren().get(row.getChildren().size() - 1);
+        if (first instanceof VBox) return first;
+        if (last instanceof VBox)  return last;
+        return first; 
+    }
+
+    
     public void enqueuePendingOutgoing(HBox row) {
         if (row != null) pendingOutgoingTexts.addLast(row);
     }

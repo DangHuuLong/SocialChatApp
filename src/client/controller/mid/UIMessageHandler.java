@@ -12,6 +12,7 @@ import javafx.scene.control.Label;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Slider;
+import javafx.scene.control.TextInputDialog;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.HBox;
@@ -52,12 +53,75 @@ public class UIMessageHandler {
         fadeOut.setToValue(0.0);
 
         ContextMenu cm = new ContextMenu();
+        cm.getStyleClass().add("msg-context");
+        MenuItem miEdit = new MenuItem("Chỉnh sửa");
+        miEdit.getStyleClass().add("msg-context-item");
         MenuItem miDelete = new MenuItem("Xóa");
-        miDelete.setStyle("-fx-text-fill:#111827; -fx-font-size:12px;");
-        cm.getItems().add(miDelete);
+        miDelete.getStyleClass().add("msg-context-item-danger");
+        cm.getItems().addAll(miEdit, miDelete);
 
+        Node bubble = null;
+        if (incoming) {
+            if (!row.getChildren().isEmpty()) bubble = row.getChildren().get(0);
+        } else {
+            if (!row.getChildren().isEmpty()) bubble = row.getChildren().get(row.getChildren().size() - 1);
+        }
+        String bubbleId = (bubble instanceof Region r) ? r.getId() : null;
+
+        boolean editable = "outgoing-text".equals(bubbleId);
+        miEdit.setDisable(!editable);
+
+        Label textLabel = null;
+        if (editable && bubble instanceof VBox vb) {
+            for (Node n : vb.getChildren()) {
+                if (n instanceof Label) { textLabel = (Label) n; break; }
+            }
+        }
+
+        final Label labelRef = findTextLabelInRow(row, incoming);
+        final boolean canEdit = (labelRef != null) && "outgoing-text".equals(
+                (row.getChildren().isEmpty() ? null
+                 : ((Region)(incoming ? row.getChildren().get(0) : row.getChildren().get(row.getChildren().size()-1)))).getId())
+        ;
+        miEdit.setDisable(!canEdit);
+        miEdit.setOnAction(e -> {
+            if (!canEdit) return;
+
+            final Object msgId = (messageId != null) ? messageId : row.getUserData();
+            if (msgId == null) return;
+
+            final String current = labelRef.getText();
+            TextInputDialog dialog = new TextInputDialog(current);
+            dialog.setTitle("Chỉnh sửa tin nhắn");
+            dialog.setHeaderText(null);
+            dialog.setContentText("Nội dung mới:");
+            dialog.getDialogPane().getStyleClass().add("msg-edit-dialog");
+
+            dialog.showAndWait().ifPresent(newText -> {
+                String trimmed = (newText == null) ? "" : newText.trim();
+                if (trimmed.isEmpty() || trimmed.equals(current)) return;
+
+                // Optimistic UI
+                labelRef.setText(trimmed);
+
+                try {
+                    long id = Long.parseLong(String.valueOf(msgId));
+                    if (controller.getConnection() != null && controller.getConnection().isAlive()) {
+                        controller.getConnection().editMessage(
+                            id,
+                            controller.getCurrentUser().getUsername(),
+                            controller.getSelectedUser().getUsername(),
+                            trimmed
+                        );
+                    }
+                } catch (Exception ex) {
+                    System.err.println("[EDIT] send failed: " + ex.getMessage());
+                }
+            });
+        });
+        
         miDelete.setOnAction(e -> {
-            boolean removed = controller.getMessageContainer().getChildren().remove(row);
+            controller.getMessageContainer().getChildren().remove(row);
             Object ud = (messageId != null) ? messageId : row.getUserData();
             if (ud != null && controller.getConnection() != null) {
                 try {
@@ -74,17 +138,15 @@ public class UIMessageHandler {
         row.setOnMouseEntered(e -> fadeIn.playFromStart());
         row.setOnMouseExited(e -> { if (!cm.isShowing()) fadeOut.playFromStart(); });
 
-        if (incoming) {
-            spacerBox.getChildren().addAll(holder, filler);
-        } else {
-            spacerBox.getChildren().addAll(filler, holder);
-        }
+        if (incoming) spacerBox.getChildren().addAll(holder, filler);
+        else          spacerBox.getChildren().addAll(filler, holder);
 
         int idx = row.getChildren().indexOf(spacer);
         if (idx >= 0) row.getChildren().set(idx, spacerBox);
 
         if (messageId != null) row.setUserData(messageId);
     }
+
 
     private void scrollToBottom() {
         var n = controller.getMessageContainer();
@@ -278,4 +340,19 @@ public class UIMessageHandler {
             lbl.getStyleClass().add("chat-status-offline");
         }
     }
+    
+    private Label findTextLabelInRow(HBox row, boolean incoming) {
+        Node bubble = null;
+        if (incoming) {
+            if (!row.getChildren().isEmpty()) bubble = row.getChildren().get(0);
+        } else {
+            if (!row.getChildren().isEmpty()) bubble = row.getChildren().get(row.getChildren().size() - 1);
+        }
+        if (!(bubble instanceof VBox vb)) return null;
+        for (Node n : vb.getChildren()) {
+            if (n instanceof Label lbl) return lbl;
+        }
+        return null;
+    }
+
 }

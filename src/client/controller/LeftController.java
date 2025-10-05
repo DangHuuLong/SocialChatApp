@@ -259,13 +259,12 @@ public class LeftController {
         if (chatList != null) chatList.requestLayout();
         
         if (logoutBtn != null) {
-            logoutBtn.setVisible(true);    // <-- thêm
-            logoutBtn.setManaged(true);    // <-- thêm
+            logoutBtn.setVisible(true);    
+            logoutBtn.setManaged(true);    
         }
     }
 
 
-    // Util
     private String humanize(String iso, boolean withDot) {
         if (iso == null || iso.isBlank()) return "";
         try {

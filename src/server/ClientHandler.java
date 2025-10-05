@@ -74,37 +74,9 @@ public class ClientHandler implements Runnable {
                          CALL_CANCEL, CALL_BUSY, CALL_END,
                          CALL_OFFER, CALL_ANSWER, CALL_ICE -> handleCall(f);
                     case DELETE_MSG -> handleDeleteMessage(f);
-                    case DOWNLOAD_FILE -> {
-                        String fileId = f.body;
-                        File file = new File(UPLOAD_DIR, sanitizeFilename(fileId));
-                        System.out.println("[SERVER] DOWNLOAD_FILE: fileId=" + fileId + ", path=" + file.getAbsolutePath());
-                        if (!file.exists()) {
-                            System.err.println("[SERVER] File not found: " + file.getAbsolutePath());
-                            sendFrame(Frame.error("FILE_NOT_FOUND"));
-                            return;
-                        }
-                        try {
-                            String mime = pickJson(f.body, "mime") != null ? pickJson(f.body, "mime") : "application/octet-stream";
-                            String name = fileNameMap.getOrDefault(fileId, fileId);
-                            Frame meta = Frame.fileMeta(username, "", name, mime, fileId, file.length());
-                            sendFrame(meta);
-                            try (InputStream fis = new BufferedInputStream(new FileInputStream(file))) {
-                                byte[] buf = new byte[Frame.CHUNK_SIZE];
-                                int n, seq = 0;
-                                long rem = file.length();
-                                while ((n = fis.read(buf)) != -1) {
-                                    rem -= n;
-                                    boolean last = (rem == 0);
-                                    byte[] slice = (n == buf.length) ? buf : Arrays.copyOf(buf, n);
-                                    Frame ch = Frame.fileChunk(username, "", fileId, seq++, last, slice);
-                                    sendFrame(ch);
-                                }
-                            }
-                        } catch (IOException e) {
-                            System.err.println("[SERVER] Download failed: " + e.getMessage());
-                            sendFrame(Frame.error("DOWNLOAD_FAIL"));
-                        }
-                    }
+                    case DOWNLOAD_FILE -> handleDownloadFiles(f);
+                    case EDIT_MSG -> handleEditMessage(f);
+
                     default -> System.out.println("[SERVER] Unknown frame: " + f.type);
                 }
             }
@@ -204,6 +176,35 @@ public class ClientHandler implements Runnable {
             sendFrame(Frame.error("DELETE_FAIL"));
         }
     }
+    
+    /* ================= EDIT ================= */
+    private void handleEditMessage(Frame f) {
+        try {
+            long id = parseLongSafe(f.transferId != null ? f.transferId : f.body, 0L);
+            if (id <= 0) { sendFrame(Frame.error("BAD_ID")); return; }
+            String newBody = (f.body == null) ? "" : f.body;
+
+            String peer = messageDao.updateByIdReturningPeer(id, username, newBody);
+            if (peer == null) {
+                sendFrame(Frame.error("DENIED_OR_NOT_FOUND"));
+                return;
+            }
+
+            // ACK cho người gửi
+            Frame ack = Frame.ack("OK EDIT");
+            ack.transferId = String.valueOf(id);
+            sendFrame(ack);
+
+            // Thông báo cho người nhận cập nhật UI
+            Frame evt = new Frame(MessageType.EDIT_MSG, username, peer, newBody);
+            evt.transferId = String.valueOf(id);
+            ClientHandler peerHandler = online.get(peer);
+            if (peerHandler != null) peerHandler.sendFrame(evt);
+        } catch (Exception e) {
+            sendFrame(Frame.error("EDIT_FAIL"));
+        }
+    }
+
 
     /* ================= HISTORY ================= */
     private void handleHistory(Frame f) {
@@ -328,6 +329,38 @@ public class ClientHandler implements Runnable {
             upOut = null; upFileId = null;
             System.err.println("[SERVER] FILE FAIL: " + e.getMessage());
             sendFrame(Frame.error("FILE_FAIL"));
+        }
+    }
+    
+    public void handleDownloadFiles(Frame f) {
+    	String fileId = f.body;
+        File file = new File(UPLOAD_DIR, sanitizeFilename(fileId));
+        System.out.println("[SERVER] DOWNLOAD_FILE: fileId=" + fileId + ", path=" + file.getAbsolutePath());
+        if (!file.exists()) {
+            System.err.println("[SERVER] File not found: " + file.getAbsolutePath());
+            sendFrame(Frame.error("FILE_NOT_FOUND"));
+            return;
+        }
+        try {
+            String mime = pickJson(f.body, "mime") != null ? pickJson(f.body, "mime") : "application/octet-stream";
+            String name = fileNameMap.getOrDefault(fileId, fileId);
+            Frame meta = Frame.fileMeta(username, "", name, mime, fileId, file.length());
+            sendFrame(meta);
+            try (InputStream fis = new BufferedInputStream(new FileInputStream(file))) {
+                byte[] buf = new byte[Frame.CHUNK_SIZE];
+                int n, seq = 0;
+                long rem = file.length();
+                while ((n = fis.read(buf)) != -1) {
+                    rem -= n;
+                    boolean last = (rem == 0);
+                    byte[] slice = (n == buf.length) ? buf : Arrays.copyOf(buf, n);
+                    Frame ch = Frame.fileChunk(username, "", fileId, seq++, last, slice);
+                    sendFrame(ch);
+                }
+            }
+        } catch (IOException e) {
+            System.err.println("[SERVER] Download failed: " + e.getMessage());
+            sendFrame(Frame.error("DOWNLOAD_FAIL"));
         }
     }
 

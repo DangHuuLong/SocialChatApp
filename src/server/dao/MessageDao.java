@@ -154,4 +154,27 @@ public class MessageDao {
             return (n > 0) ? recipient : null;
         }
     }
+    
+    public String updateByIdReturningPeer(long id, String requester, String newBody) throws SQLException {
+        String sel = "SELECT sender, recipient FROM messages WHERE id=?";
+        String sender = null, recipient = null;
+        try (PreparedStatement ps = conn.prepareStatement(sel)) {
+            ps.setLong(1, id);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    sender = rs.getString("sender");
+                    recipient = rs.getString("recipient");
+                }
+            }
+        }
+        if (sender == null || !sender.equals(requester)) return null;
+
+        String upd = "UPDATE messages SET body=?, updated_at=NOW() WHERE id=?";
+        try (PreparedStatement ps = conn.prepareStatement(upd)) {
+            ps.setString(1, newBody);
+            ps.setLong(2, id);
+            int n = ps.executeUpdate();
+            return (n > 0) ? recipient : null;
+        }
+    }
 }
