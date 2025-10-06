@@ -5,15 +5,21 @@ import javafx.animation.Timeline;
 import javafx.application.Platform;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.SimpleBooleanProperty;
+import javafx.fxml.FXMLLoader;
 import javafx.geometry.Insets;
 import javafx.scene.Node;
+import javafx.scene.Parent;
+import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.*;
+import javafx.scene.shape.Circle;
+import javafx.stage.Stage;
 import javafx.util.Duration;
 import server.dao.UserDAO;
 import javafx.geometry.Pos;
+import javafx.geometry.Side;
 
 import java.sql.SQLException;
 import java.time.Instant;
@@ -22,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
 
+import client.ClientConnection;
 import common.User;
 
 public class LeftController {
@@ -33,14 +40,16 @@ public class LeftController {
     private Label titleLabel;
     private Button toggleSidebarBtn;
     private Button searchIconBtn;
-    private Button logoutBtn;
-    private Runnable onLogout;  
-
+    private Button settingsBtn; 
+    private ClientConnection connection; 
+    private Stage hostStage;  
+    
     private final Map<Integer, Label> lastLabels = new HashMap<>();
     private final Map<Integer, User> idToUser = new HashMap<>();
     private Timeline poller;
 
     private final BooleanProperty collapsed = new SimpleBooleanProperty(false);
+    private final BooleanProperty dark = new SimpleBooleanProperty(false); 
 
     private User currentUser;
     private Consumer<User> onOpenConversation;
@@ -53,7 +62,7 @@ public class LeftController {
             Label titleLabel,
             Button toggleSidebarBtn,
             Button searchIconBtn,
-            Button logoutBtn,
+            Button settingsBtn, 
             HBox leftHeader,             
             Region leftHeaderSpacer
     ) {
@@ -63,7 +72,7 @@ public class LeftController {
         this.titleLabel = titleLabel;
         this.toggleSidebarBtn = toggleSidebarBtn;
         this.searchIconBtn = searchIconBtn;
-        this.logoutBtn = logoutBtn;
+        this.settingsBtn = settingsBtn;
         this.leftHeader = leftHeader;       
         this.leftHeaderSpacer = leftHeaderSpacer;
 
@@ -81,20 +90,41 @@ public class LeftController {
             });
         }
         
-        if (this.logoutBtn != null) {
-            this.logoutBtn.setOnAction(e -> { if (onLogout != null) onLogout.run(); }); // <-- thêm
+        if (this.settingsBtn != null) {
+            final MenuItem toggleThemeItem = new MenuItem("Đổi giao diện: 🌞 → 🌑");
+            final MenuItem logoutItem = new MenuItem("🚪 Logout");
+
+            // cập nhật nhãn khi đổi dark/light
+            dark.addListener((ob, oldV, newV) -> {
+                toggleThemeItem.setText(newV ? "Đổi giao diện: 🌑 → 🌞" : "Đổi giao diện: 🌞 → 🌑");
+                applyDarkClass(newV);
+            });
+
+            toggleThemeItem.setOnAction(e -> dark.set(!dark.get()));
+            logoutItem.setOnAction(e -> performLogout());
+
+            final ContextMenu settingsMenu = new ContextMenu(toggleThemeItem, logoutItem);
+            settingsMenu.getStyleClass().add("settings-menu"); 
+            logoutItem.getStyleClass().add("logout-item");
+
+            this.settingsBtn.setOnAction(e -> {
+                if (settingsMenu.isShowing()) {
+                    settingsMenu.hide();
+                } else {
+                    settingsMenu.show(settingsBtn, Side.TOP, 0, -6);
+                }
+            });
         }
 
         collapsed.addListener((o,ov,nv) -> applyCollapsedUI(nv));
         applyCollapsedUI(collapsed.get());
+        applyDarkClass(false);
     }
     
-    public void setOnLogout(Runnable cb) {         
-        this.onLogout = cb;
-    }
-
     public void setCurrentUser(User user) { this.currentUser = user; }
     public void setOnOpenConversation(Consumer<User> cb) { this.onOpenConversation = cb; }
+   	public void setConnection(ClientConnection conn) { this.connection = conn; }
+	public void setHostStage(Stage stage) { this.hostStage = stage; }
 
     // ===== Users / Presence list =====
     private void renderUsers(List<User> users) {
@@ -141,12 +171,8 @@ public class LeftController {
         row.setPadding(new Insets(8, 8, 8, 8));
         row.setUserData(u.getId());
 
-        ImageView avatar = new ImageView(new Image(
-                getClass().getResource("/client/view/images/default user.png").toExternalForm()
-        ));
-        avatar.setFitWidth(40);
-        avatar.setFitHeight(40);
-        avatar.setPreserveRatio(true);
+        Image img = new Image(getClass().getResource("/client/view/images/avatar.jpg").toExternalForm());
+        StackPane avatarPane = buildCircularAvatar(img, 40);
 
         VBox textBox = new VBox(2);
         HBox.setHgrow(textBox, Priority.ALWAYS);
@@ -164,7 +190,7 @@ public class LeftController {
         textBox.visibleProperty().bind(collapsed.not());
         textBox.managedProperty().bind(collapsed.not());
 
-        row.getChildren().addAll(avatar, textBox);
+        row.getChildren().addAll(avatarPane, textBox);
 
         row.setOnMouseClicked(ev -> {
             Integer uid = (Integer) row.getUserData();
@@ -246,22 +272,85 @@ public class LeftController {
         if (searchField != null) { searchField.setVisible(!isCollapsed); searchField.setManaged(!isCollapsed); }
         if (searchIconBtn != null) { searchIconBtn.setVisible(isCollapsed); searchIconBtn.setManaged(isCollapsed); }
 
-        if (logoutBtn != null) {
-            logoutBtn.setText(isCollapsed ? "🚪" : "🚪 Logout");
+        if (settingsBtn != null) {
+            settingsBtn.setText(isCollapsed ? "🔧" : "🔧 Cài đặt");
             if (isCollapsed) {
-                if (!logoutBtn.getStyleClass().contains("logout-compact"))
-                    logoutBtn.getStyleClass().add("logout-compact");
+                if (!settingsBtn.getStyleClass().contains("settings-compact"))
+                    settingsBtn.getStyleClass().add("settings-compact");
             } else {
-                logoutBtn.getStyleClass().remove("logout-compact");
+                settingsBtn.getStyleClass().remove("settings-compact");
             }
+            settingsBtn.setVisible(true);
+            settingsBtn.setManaged(true);
         }
 
         if (chatList != null) chatList.requestLayout();
-        
-        if (logoutBtn != null) {
-            logoutBtn.setVisible(true);    
-            logoutBtn.setManaged(true);    
+    }
+    
+    private void applyDarkClass(boolean enable) {
+        if (sidebar == null) return;
+        Node root = sidebar.getScene() != null ? sidebar.getScene().getRoot() : null;
+        if (root != null) {
+            var sc = root.getStyleClass();
+            if (enable) {
+                if (!sc.contains("dark")) sc.add("dark");
+            } else {
+                sc.remove("dark");
+            }
         }
+    }
+    
+    private void performLogout() {
+        try {
+            if (currentUser != null) {
+                UserDAO.setOnline(currentUser.getId(), false);
+            }
+        } catch (SQLException ignored) {}
+
+        stopPolling();
+
+        if (connection != null) {
+            try { connection.close(); } catch (Exception ignored) {}
+            connection = null;
+        }
+
+        try {
+            if (hostStage == null && sidebar != null && sidebar.getScene() != null) {
+                hostStage = (Stage) sidebar.getScene().getWindow();
+            }
+            if (hostStage != null) {
+                FXMLLoader loader = new FXMLLoader(getClass().getResource("/client/view/Main.fxml"));
+                Parent root = loader.load();
+                Scene scene = new Scene(root);
+                hostStage.setScene(scene);
+                hostStage.centerOnScreen();
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+    
+    private StackPane buildCircularAvatar(Image img, double size) {
+        ImageView iv = new ImageView(img);
+        iv.setFitWidth(size);
+        iv.setFitHeight(size);
+        iv.setPreserveRatio(true);
+
+        StackPane wrap = new StackPane(iv);
+        wrap.setMinSize(size, size);
+        wrap.setPrefSize(size, size);
+        wrap.setMaxSize(size, size);
+
+        double r = size / 2.0;
+        Circle clip = new Circle(r, r, r);
+        wrap.setClip(clip);
+
+        Circle ring = new Circle(r, r, r - 0.6);
+        ring.getStyleClass().add("avatar-ring");
+        ring.setMouseTransparent(true);
+        wrap.getChildren().add(ring);
+
+        return wrap;
     }
 
 

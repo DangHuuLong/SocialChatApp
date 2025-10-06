@@ -37,7 +37,7 @@ public class HomeController {
     @FXML private Label currentChatStatus;
     @FXML private VBox messageContainer;
     @FXML private TextField messageField;
-    @FXML private Button logoutBtn;
+    @FXML private Button settingsBtn;
     @FXML private Label infoName;
     @FXML private Label chatStatus;
     @FXML private StackPane centerStack;
@@ -75,7 +75,7 @@ public class HomeController {
             titleLabel,
             toggleSidebarBtn,
             searchIconBtn,
-            logoutBtn,
+            settingsBtn,         
             leftHeader, leftHeaderSpacer
         );
         rightCtrl.bind(infoName, chatStatus);
@@ -88,11 +88,17 @@ public class HomeController {
             toggleRightEmpty(false);
             midCtrl.openConversation(user);
         });
-        leftCtrl.setOnLogout(this::performLogout);  
+
+        Platform.runLater(() -> {
+            if (centerStack != null && centerStack.getScene() != null) {
+                leftCtrl.setHostStage((Stage) centerStack.getScene().getWindow());
+            }
+        });
 
         toggleCenterEmpty(true);
         toggleRightEmpty(true);
     }
+
 
 
     private void toggleCenterEmpty(boolean showEmpty) {
@@ -128,6 +134,7 @@ public class HomeController {
     public void setConnection(ClientConnection conn) {
         this.connection = conn;
         midCtrl.setConnection(conn);
+        leftCtrl.setConnection(conn);
     }
 
     public void reloadAll() { leftCtrl.reloadAll(); }
@@ -293,34 +300,6 @@ public class HomeController {
     private void onCall() {
         if (midCtrl != null) {
             midCtrl.callCurrentPeer();
-        }
-    }
-
-    private void performLogout() {
-        try {
-            if (currentUser != null) {
-                UserDAO.setOnline(currentUser.getId(), false);
-            }
-        } catch (SQLException ignored) {}
-
-        leftCtrl.stopPolling();
-
-        if (connection != null) {
-            try { connection.close(); } catch (Exception ignored) {}
-            connection = null;
-        }
-
-        currentUser = null;
-
-        try {
-            Stage stage = (Stage) logoutBtn.getScene().getWindow();
-            FXMLLoader loader = new FXMLLoader(getClass().getResource("/client/view/Main.fxml"));
-            Parent root = loader.load();
-            Scene scene = new Scene(root);
-            stage.setScene(scene);
-            stage.centerOnScreen();
-        } catch (Exception e) {
-            e.printStackTrace();
         }
     }
 
