@@ -35,15 +35,16 @@
 		
 		        <!-- Danh sách chat -->
 		        <ScrollPane fitToWidth="true" HBox.hgrow="NEVER" prefHeight="600.0"
-		                    hbarPolicy="NEVER" styleClass="list-scroll">
-		            <content>
-		                <VBox fx:id="chatList" spacing="6" fillWidth="true">
-		                    <padding>
-		                        <Insets top="8" right="8" bottom="8" left="12"/>
-		                    </padding>
-		                </VBox>
-		            </content>
-		        </ScrollPane>
+				            hbarPolicy="NEVER" vbarPolicy="NEVER" styleClass="list-scroll">
+				    <content>
+				        <VBox fx:id="chatList" spacing="6" fillWidth="true">
+				            <padding>
+				                <Insets top="8" right="8" bottom="8" left="12"/>
+				            </padding>
+				        </VBox>
+				    </content>
+				</ScrollPane>
+
 		
 		        <!-- Đẩy footer xuống đáy -->
 		        <Region VBox.vgrow="ALWAYS"/>
@@ -66,7 +67,7 @@
                     <children>
                         <StackPane prefWidth="44" prefHeight="44" maxWidth="44" maxHeight="44" minWidth="44" minHeight="44">
 						    <children>
-						        <ImageView fitWidth="44" fitHeight="44" pickOnBounds="true" preserveRatio="true">
+						        <ImageView fx:id="midHeaderAvatar" fitWidth="44" fitHeight="44" pickOnBounds="true" preserveRatio="true">
 						            <image><Image url="@images/avatar.jpg"/></image>
 						        </ImageView>
 						        <Circle radius="22" centerX="22" centerY="22" styleClass="avatar-ring" mouseTransparent="true"/>
@@ -131,7 +132,7 @@
                         <children>
                             <StackPane prefWidth="84" prefHeight="84" maxWidth="84" maxHeight="84" minWidth="84" minHeight="84">
 							    <children>
-							        <ImageView fitWidth="84" fitHeight="84" pickOnBounds="true" preserveRatio="true">
+							        <ImageView fx:id="rightHeaderAvatar" fitWidth="84" fitHeight="84" pickOnBounds="true" preserveRatio="true">
 							            <image><Image url="@images/avatar.jpg"/></image>
 							        </ImageView>
 							        <Circle radius="42" centerX="42" centerY="42" styleClass="avatar-ring" mouseTransparent="true"/>

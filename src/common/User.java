@@ -4,7 +4,9 @@ public class User {
     private int id;
     private String username;
     private String password;
-
+    private byte[] avatar;
+    private String avatarMime;
+    
     public User() {}
 
     public User(int id, String username, String password) {
@@ -41,4 +43,10 @@ public class User {
     public void setPassword(String password) {
         this.password = password;
     }
+    
+    public byte[] getAvatar() { return avatar; }
+    public void setAvatar(byte[] avatar) { this.avatar = avatar; }
+
+    public String getAvatarMime() { return avatarMime; }
+    public void setAvatarMime(String avatarMime) { this.avatarMime = avatarMime; }
 }

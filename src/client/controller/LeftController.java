@@ -1,5 +1,7 @@
 package client.controller;
 
+import client.ClientConnection;
+import common.User;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
 import javafx.application.Platform;
@@ -7,6 +9,8 @@ import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.SimpleBooleanProperty;
 import javafx.fxml.FXMLLoader;
 import javafx.geometry.Insets;
+import javafx.geometry.Pos;
+import javafx.geometry.Side;
 import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
@@ -18,43 +22,40 @@ import javafx.scene.shape.Circle;
 import javafx.stage.Stage;
 import javafx.util.Duration;
 import server.dao.UserDAO;
-import javafx.geometry.Pos;
-import javafx.geometry.Side;
 
+import java.io.ByteArrayInputStream;
 import java.sql.SQLException;
 import java.time.Instant;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.function.Consumer;
 
-import client.ClientConnection;
-import common.User;
-
 public class LeftController {
-	private HBox leftHeader;
-	private Region leftHeaderSpacer;
+    private HBox leftHeader;
+    private Region leftHeaderSpacer;
     private VBox sidebar;
     private VBox chatList;
     private TextField searchField;
     private Label titleLabel;
     private Button toggleSidebarBtn;
     private Button searchIconBtn;
-    private Button settingsBtn; 
-    private ClientConnection connection; 
-    private Stage hostStage;  
-    
+    private Button settingsBtn;
+    private ClientConnection connection;
+    private Stage hostStage;
+
     private final Map<Integer, Label> lastLabels = new HashMap<>();
     private final Map<Integer, User> idToUser = new HashMap<>();
     private Timeline poller;
 
     private final BooleanProperty collapsed = new SimpleBooleanProperty(false);
-    private final BooleanProperty dark = new SimpleBooleanProperty(false); 
+    private final BooleanProperty dark = new SimpleBooleanProperty(false);
 
     private User currentUser;
     private Consumer<User> onOpenConversation;
 
-    /* ==== BIND UI ==== */
+    // Cache avatar để tránh query lặp
+    private final Map<Integer, Image> avatarCache = new HashMap<>();
+    private Image defaultAvatar; // lazy-load
+
     public void bind(
             VBox sidebar,
             VBox chatList,
@@ -62,8 +63,8 @@ public class LeftController {
             Label titleLabel,
             Button toggleSidebarBtn,
             Button searchIconBtn,
-            Button settingsBtn, 
-            HBox leftHeader,             
+            Button settingsBtn,
+            HBox leftHeader,
             Region leftHeaderSpacer
     ) {
         this.sidebar = sidebar;
@@ -73,7 +74,7 @@ public class LeftController {
         this.toggleSidebarBtn = toggleSidebarBtn;
         this.searchIconBtn = searchIconBtn;
         this.settingsBtn = settingsBtn;
-        this.leftHeader = leftHeader;       
+        this.leftHeader = leftHeader;
         this.leftHeaderSpacer = leftHeaderSpacer;
 
         if (this.searchField != null) {
@@ -89,12 +90,11 @@ public class LeftController {
                 Platform.runLater(() -> { if (searchField != null) searchField.requestFocus(); });
             });
         }
-        
+
         if (this.settingsBtn != null) {
             final MenuItem toggleThemeItem = new MenuItem("Đổi giao diện: 🌞 → 🌑");
-            final MenuItem logoutItem = new MenuItem("🚪 Logout");
+            final MenuItem logoutItem = new MenuItem("🚪 Đăng xuất");
 
-            // cập nhật nhãn khi đổi dark/light
             dark.addListener((ob, oldV, newV) -> {
                 toggleThemeItem.setText(newV ? "Đổi giao diện: 🌑 → 🌞" : "Đổi giao diện: 🌞 → 🌑");
                 applyDarkClass(newV);
@@ -104,7 +104,7 @@ public class LeftController {
             logoutItem.setOnAction(e -> performLogout());
 
             final ContextMenu settingsMenu = new ContextMenu(toggleThemeItem, logoutItem);
-            settingsMenu.getStyleClass().add("settings-menu"); 
+            settingsMenu.getStyleClass().add("settings-menu");
             logoutItem.getStyleClass().add("logout-item");
 
             this.settingsBtn.setOnAction(e -> {
@@ -120,13 +120,12 @@ public class LeftController {
         applyCollapsedUI(collapsed.get());
         applyDarkClass(false);
     }
-    
+
     public void setCurrentUser(User user) { this.currentUser = user; }
     public void setOnOpenConversation(Consumer<User> cb) { this.onOpenConversation = cb; }
-   	public void setConnection(ClientConnection conn) { this.connection = conn; }
-	public void setHostStage(Stage stage) { this.hostStage = stage; }
+    public void setConnection(ClientConnection conn) { this.connection = conn; }
+    public void setHostStage(Stage stage) { this.hostStage = stage; }
 
-    // ===== Users / Presence list =====
     private void renderUsers(List<User> users) {
         chatList.getChildren().clear();
         lastLabels.clear();
@@ -151,12 +150,12 @@ public class LeftController {
 
     public void searchUsers(String keyword) {
         if (currentUser == null) return;
-        keyword = keyword == null ? "" : keyword.trim();
-        if (keyword.isEmpty()) {
+        String k = (keyword == null) ? "" : keyword.trim();
+        if (k.isEmpty()) {
             reloadAll();
         } else {
             try {
-                List<User> res = UserDAO.searchUsers(keyword, currentUser.getId());
+                List<User> res = UserDAO.searchUsers(k, currentUser.getId());
                 renderUsers(res);
                 if (poller == null) startPollingPresence();
             } catch (SQLException e) {
@@ -168,10 +167,10 @@ public class LeftController {
     private HBox createChatItem(User u) {
         HBox row = new HBox(10);
         row.getStyleClass().add("chat-item");
-        row.setPadding(new Insets(8, 8, 8, 8));
+        row.setPadding(new Insets(8));
         row.setUserData(u.getId());
 
-        Image img = new Image(getClass().getResource("/client/view/images/avatar.jpg").toExternalForm());
+        Image img = loadAvatarImage(u.getId());
         StackPane avatarPane = buildCircularAvatar(img, 40);
 
         VBox textBox = new VBox(2);
@@ -186,7 +185,6 @@ public class LeftController {
 
         textBox.getChildren().addAll(name, last);
 
-        // Thu nhỏ: chỉ còn avatar
         textBox.visibleProperty().bind(collapsed.not());
         textBox.managedProperty().bind(collapsed.not());
 
@@ -200,6 +198,39 @@ public class LeftController {
             }
         });
         return row;
+    }
+
+    private Image loadAvatarImage(int userId) {
+        try {
+            Image cached = avatarCache.get(userId);
+            if (cached != null) return cached;
+
+            byte[] bytes = UserDAO.getAvatarById(userId); 
+            Image img;
+            if (bytes != null && bytes.length > 0) {
+                img = new Image(new ByteArrayInputStream(bytes));
+            } else {
+                if (defaultAvatar == null) {
+                    defaultAvatar = new Image(
+                        Objects.requireNonNull(
+                            getClass().getResource("/client/view/images/default user.png")
+                        ).toExternalForm()
+                    );
+                }
+                img = defaultAvatar;
+            }
+            avatarCache.put(userId, img);
+            return img;
+        } catch (Exception e) {
+            if (defaultAvatar == null) {
+                defaultAvatar = new Image(
+                    Objects.requireNonNull(
+                        getClass().getResource("/client/view/images/default user.png")
+                    ).toExternalForm()
+                );
+            }
+            return defaultAvatar;
+        }
     }
 
     public void startPollingPresence() {
@@ -237,22 +268,18 @@ public class LeftController {
         }
     }
 
-    // === Thu/phóng UI ===
     private void applyCollapsedUI(boolean isCollapsed) {
         if (sidebar != null) {
             if (isCollapsed) {
-                if (!sidebar.getStyleClass().contains("collapsed"))
-                    sidebar.getStyleClass().add("collapsed");
-                sidebar.setAlignment(Pos.TOP_CENTER);        
+                if (!sidebar.getStyleClass().contains("collapsed")) sidebar.getStyleClass().add("collapsed");
+                sidebar.setAlignment(Pos.TOP_CENTER);
             } else {
                 sidebar.getStyleClass().remove("collapsed");
-                sidebar.setAlignment(Pos.TOP_LEFT);           
+                sidebar.setAlignment(Pos.TOP_LEFT);
             }
         }
 
-        if (leftHeader != null) {
-            leftHeader.setAlignment(isCollapsed ? Pos.CENTER : Pos.CENTER_LEFT);
-        }
+        if (leftHeader != null) leftHeader.setAlignment(isCollapsed ? Pos.CENTER : Pos.CENTER_LEFT);
         if (leftHeaderSpacer != null) {
             leftHeaderSpacer.setVisible(!isCollapsed);
             leftHeaderSpacer.setManaged(!isCollapsed);
@@ -286,7 +313,7 @@ public class LeftController {
 
         if (chatList != null) chatList.requestLayout();
     }
-    
+
     private void applyDarkClass(boolean enable) {
         if (sidebar == null) return;
         Node root = sidebar.getScene() != null ? sidebar.getScene().getRoot() : null;
@@ -299,13 +326,9 @@ public class LeftController {
             }
         }
     }
-    
+
     private void performLogout() {
-        try {
-            if (currentUser != null) {
-                UserDAO.setOnline(currentUser.getId(), false);
-            }
-        } catch (SQLException ignored) {}
+        try { if (currentUser != null) UserDAO.setOnline(currentUser.getId(), false); } catch (SQLException ignored) {}
 
         stopPolling();
 
@@ -329,7 +352,7 @@ public class LeftController {
             e.printStackTrace();
         }
     }
-    
+
     private StackPane buildCircularAvatar(Image img, double size) {
         ImageView iv = new ImageView(img);
         iv.setFitWidth(size);
@@ -352,7 +375,6 @@ public class LeftController {
 
         return wrap;
     }
-
 
     private String humanize(String iso, boolean withDot) {
         if (iso == null || iso.isBlank()) return "";

@@ -20,14 +20,24 @@ public class UserDAO {
         }
     }
 
-    public boolean register(String username, String plainPassword) throws SQLException {
+    public boolean register(String username, String plainPassword, byte[] avatar, String avatarMime) throws SQLException {
         if (usernameExists(username)) return false;
-        String hashed = BCrypt.hashpw(plainPassword, BCrypt.gensalt(12)); // cost=12
-        String sql = "INSERT INTO users(username, password) VALUES(?, ?)";
+        String hashed = BCrypt.hashpw(plainPassword, BCrypt.gensalt(12));
+
+        String sql = "INSERT INTO users(username, password, avatar, avatar_mime) VALUES(?, ?, ?, ?)";
         try (Connection c = DBConnection.get();
              PreparedStatement ps = c.prepareStatement(sql)) {
             ps.setString(1, username);
             ps.setString(2, hashed);
+
+            if (avatar != null && avatar.length > 0) {
+                ps.setBytes(3, avatar); 
+                ps.setString(4, avatarMime);
+            } else {
+                ps.setNull(3, Types.BLOB);
+                ps.setNull(4, Types.VARCHAR);
+            }
+
             return ps.executeUpdate() == 1;
         }
     }
@@ -129,7 +139,7 @@ public class UserDAO {
 
     public static class Presence {
         public final boolean online;
-        public final String lastSeenIso; // có thể null
+        public final String lastSeenIso; 
         public Presence(boolean o, String t) { online=o; lastSeenIso=t; }
     }
 
@@ -141,12 +151,26 @@ public class UserDAO {
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     boolean online = rs.getInt("online") == 1;
-                    String lastSeen = rs.getString("last_seen"); // có thể null
+                    String lastSeen = rs.getString("last_seen");
                     return new Presence(online, lastSeen);
                 }
             }
         }
-        return null; // không tìm thấy user
+        return null;
+    }
+    
+    public static byte[] getAvatarById(int userId) throws SQLException {
+        String sql = "SELECT avatar FROM users WHERE id = ?";
+        try (Connection c = DBConnection.get();
+             PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setInt(1, userId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getBytes(1); 
+                }
+            }
+        }
+        return null;
     }
 
 

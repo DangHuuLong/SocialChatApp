@@ -2,21 +2,31 @@ package client.controller;
 
 import common.User;
 import javafx.scene.control.Label;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
 
 import java.time.Instant;
 
 public class RightController {
     private Label infoName;
     private Label chatStatus;
+    private ImageView rightHeaderAvatar;
 
-    public void bind(Label infoName, Label chatStatus) {
+    public void bind(Label infoName, Label chatStatus, ImageView rightHeaderAvatar) {
         this.infoName = infoName;
         this.chatStatus = chatStatus;
+        this.rightHeaderAvatar = rightHeaderAvatar;
     }
 
     public void showUser(User u, boolean online, String lastSeenIso) {
         if (infoName != null) infoName.setText(u.getUsername());
         applyStatusLabel(chatStatus, online, lastSeenIso);
+    }
+    
+    public void setAvatar(Image img) {
+        if (rightHeaderAvatar != null && img != null) {
+            rightHeaderAvatar.setImage(img);
+        }
     }
 
     private void applyStatusLabel(Label lbl, boolean online, String lastSeenIso) {

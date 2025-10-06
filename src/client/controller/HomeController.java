@@ -56,6 +56,8 @@ public class HomeController {
     @FXML private Button searchIconBtn;
     @FXML private Button toggleRightBtn;
     @FXML private Node rightSearchTrigger;
+    @FXML private ImageView midHeaderAvatar;
+    @FXML private ImageView rightHeaderAvatar;
 
 
 	private HBox leftHeader;
@@ -77,8 +79,9 @@ public class HomeController {
             titleLabel, toggleSidebarBtn, searchIconBtn,
             settingsBtn, leftHeader, leftHeaderSpacer
         );
-        rightCtrl.bind(infoName, chatStatus);
-        midCtrl.bind(currentChatName, currentChatStatus, messageContainer, messageField);
+        rightCtrl.bind(infoName, chatStatus, rightHeaderAvatar);
+        midCtrl.bind(currentChatName, currentChatStatus, messageContainer, messageField, midHeaderAvatar);
+
         midCtrl.setRightController(rightCtrl);
 
         leftCtrl.setOnOpenConversation(user -> {

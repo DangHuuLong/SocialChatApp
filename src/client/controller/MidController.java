@@ -19,6 +19,7 @@ import javafx.beans.value.ChangeListener;
 import javafx.scene.Node;
 import javafx.scene.control.*;
 import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
 import javafx.scene.layout.*;
 import javafx.stage.Stage;
 import javafx.stage.Window;
@@ -68,6 +69,8 @@ public class MidController implements CallSignalListener {
 
     private LanVideoSession videoSession;
     private LanAudioSession audioSession;
+    
+    private ImageView midHeaderAvatar;
 
     private ChangeListener<Number> autoScrollListener;
     private final List<MsgView> messageSnapshot = new ArrayList<>();
@@ -84,11 +87,12 @@ public class MidController implements CallSignalListener {
     
     private final ArrayDeque<HBox> pendingOutgoingTexts = new ArrayDeque<>();
 
-    public void bind(Label currentChatName, Label currentChatStatus, VBox messageContainer, TextField messageField) {
+    public void bind(Label currentChatName, Label currentChatStatus, VBox messageContainer, TextField messageField, ImageView midHeaderAvatar) {
         this.currentChatName = currentChatName;
         this.currentChatStatus = currentChatStatus;
         this.messageContainer = messageContainer;
         this.messageField = messageField;
+        this.midHeaderAvatar = midHeaderAvatar;
 
         if (this.messageField != null) this.messageField.setOnAction(e -> onSendMessage());
     }
@@ -123,6 +127,14 @@ public class MidController implements CallSignalListener {
             applyStatusLabel(currentChatStatus, false, null);
             if (rightController != null) rightController.showUser(u, false, null);
         }
+        
+        Image peerAvatar = loadAvatarImage(u.getId());
+        if (midHeaderAvatar != null && peerAvatar != null) {
+            midHeaderAvatar.setImage(peerAvatar);
+        }
+        if (rightController != null) {
+            rightController.setAvatar(peerAvatar);
+        }
 
         if (messageContainer != null) {
             if (messageContainer.getChildren().size() > 100) {
@@ -148,6 +160,22 @@ public class MidController implements CallSignalListener {
         List<Frame> pending = pendingFileEvents.remove(u.getUsername());
         if (pending != null) pending.forEach(this::handleServerFrame);
     }
+    
+
+	private Image loadAvatarImage(int userId) {
+	    try {
+	        byte[] bytes = server.dao.UserDAO.getAvatarById(userId); 
+	        if (bytes != null && bytes.length > 0) {
+	            return new Image(new java.io.ByteArrayInputStream(bytes));
+	        }
+	    } catch (Exception ignore) { }
+	    // fallback default
+	    return new Image(
+	        Objects.requireNonNull(
+	            getClass().getResource("/client/view/images/default user.png")
+	        ).toExternalForm()
+	    );
+	}
     
     private void snapshotText(String text, boolean incoming) {
         if (text == null) return;
