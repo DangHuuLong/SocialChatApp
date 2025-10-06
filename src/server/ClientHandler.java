@@ -76,7 +76,7 @@ public class ClientHandler implements Runnable {
                     case DELETE_MSG -> handleDeleteMessage(f);
                     case DOWNLOAD_FILE -> handleDownloadFiles(f);
                     case EDIT_MSG -> handleEditMessage(f);
-
+                    case SEARCH -> handleSearch(f);
                     default -> System.out.println("[SERVER] Unknown frame: " + f.type);
                 }
             }
@@ -205,6 +205,26 @@ public class ClientHandler implements Runnable {
         }
     }
 
+
+    /* ================= SEARCH MESSAGE ================= */
+    private void handleSearch(Frame f){
+        String peer = f.recipient;
+        String q = jsonGet(f.body, "q");
+        if (q == null) q = "";
+        int limit = (f.seq > 0) ? f.seq : 50;
+        int offset = (int) parseLongSafe(jsonGet(f.body, "offset"), 0);
+        try{
+            var rows = messageDao.searchConversation(username, peer, q, limit, offset);
+            for (var r : rows){
+                Frame hit = new Frame(common.MessageType.SEARCH_HIT, r.sender, r.recipient, r.body);
+                hit.transferId = String.valueOf(r.id);
+                sendFrame(hit);
+            }
+            sendFrame(Frame.ack("OK SEARCH " + rows.size()));
+        }catch(Exception e){
+            sendFrame(Frame.error("SEARCH_FAIL"));
+        }
+    }
 
     /* ================= HISTORY ================= */
     private void handleHistory(Frame f) {

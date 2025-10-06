@@ -33,6 +33,20 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
 public class MidController implements CallSignalListener {
+	public static final class MsgView {
+	    private final long epochMillis;
+	    private final boolean incoming;
+	    private final String text;
+	    public MsgView(long epochMillis, boolean incoming, String text) {
+	        this.epochMillis = epochMillis; this.incoming = incoming; this.text = text;
+	    }
+	    public long epochMillis(){ return epochMillis; }
+	    public boolean incoming(){ return incoming; }
+	    public String text(){ return text; }
+	}
+	public List<MsgView> exportMessagesForSearch() {
+	    return new ArrayList<>(this.messageSnapshot);
+	}
     private Label currentChatName;
     private Label currentChatStatus;
     private VBox messageContainer;
@@ -56,6 +70,7 @@ public class MidController implements CallSignalListener {
     private LanAudioSession audioSession;
 
     private ChangeListener<Number> autoScrollListener;
+    private final List<MsgView> messageSnapshot = new ArrayList<>();
 
     private final Map<String, List<Frame>> pendingFileEvents = new ConcurrentHashMap<>();
     private final Map<String, String> fileIdToName = new ConcurrentHashMap<>();
@@ -101,7 +116,6 @@ public class MidController implements CallSignalListener {
             UserDAO.Presence p = UserDAO.getPresence(u.getId());
             boolean online = p != null && p.online;
             String lastSeen = (p != null) ? p.lastSeenIso : null;
-
             applyStatusLabel(currentChatStatus, online, lastSeen);
             if (rightController != null) rightController.showUser(u, online, lastSeen);
         } catch (SQLException e) {
@@ -116,6 +130,8 @@ public class MidController implements CallSignalListener {
             }
             messageContainer.getChildren().clear();
         }
+
+        messageSnapshot.clear(); 
 
         enableAutoScroll();
 
@@ -132,7 +148,13 @@ public class MidController implements CallSignalListener {
         List<Frame> pending = pendingFileEvents.remove(u.getUsername());
         if (pending != null) pending.forEach(this::handleServerFrame);
     }
+    
+    private void snapshotText(String text, boolean incoming) {
+        if (text == null) return;
+        messageSnapshot.add(new MsgView(System.currentTimeMillis(), incoming, text));
+    }
 
+    
     private void handleServerFrame(Frame f) {
         new MessageHandler(this).handleServerFrame(f);
     }
@@ -228,7 +250,9 @@ public class MidController implements CallSignalListener {
     }
 
     public HBox addTextMessage(String text, boolean incoming) {
-        return addTextMessage(text, incoming, null);
+        HBox row = addTextMessage(text, incoming, null);
+        snapshotText(text, incoming);
+        return row;
     }
     public HBox addImageMessage(Image img, String caption, boolean incoming) {
         return addImageMessage(img, caption, incoming, null);
@@ -245,7 +269,9 @@ public class MidController implements CallSignalListener {
     }
 
     public HBox addTextMessage(String text, boolean incoming, String messageId) {
-        return new UIMessageHandler(this).addTextMessage(text, incoming, messageId);
+        HBox row = new UIMessageHandler(this).addTextMessage(text, incoming, messageId);
+        snapshotText(text, incoming);
+        return row;
     }
     public HBox addImageMessage(Image img, String caption, boolean incoming, String messageId) {
         return new UIMessageHandler(this).addImageMessage(img, caption, incoming, messageId);

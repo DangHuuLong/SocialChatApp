@@ -177,4 +177,88 @@ public class MessageDao {
             return (n > 0) ? recipient : null;
         }
     }
+    
+    public List<HistoryRow> searchConversation(String a, String b, String q, int limit, int offset) throws SQLException {
+        String sql = """
+            SELECT id,sender,recipient,body,created_at
+            FROM messages
+            WHERE ((sender=? AND recipient=?) OR (sender=? AND recipient=?))
+              AND body COLLATE utf8mb4_0900_ai_ci LIKE ?
+            ORDER BY created_at ASC
+            LIMIT ? OFFSET ?
+        """;
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, a);
+            ps.setString(2, b);
+            ps.setString(3, b);
+            ps.setString(4, a);
+            ps.setString(5, "%" + q + "%");
+            ps.setInt(6, Math.max(1, limit));
+            ps.setInt(7, Math.max(0, offset));
+            try (ResultSet rs = ps.executeQuery()) {
+                List<HistoryRow> out = new ArrayList<>();
+                while (rs.next()) {
+                    out.add(new HistoryRow(
+                        rs.getLong("id"),
+                        rs.getString("sender"),
+                        rs.getString("recipient"),
+                        rs.getString("body"),
+                        rs.getTimestamp("created_at")
+                    ));
+                }
+                return out;
+            }
+        } catch (SQLException e) {
+            return searchConversationFallbackJava(a, b, q, limit, offset);
+        }
+    }
+
+    private static String normalizeAscii(String s){
+        if(s==null) return "";
+        String n=java.text.Normalizer.normalize(s, java.text.Normalizer.Form.NFD);
+        n=n.replaceAll("\\p{M}+","");
+        return n.toLowerCase(java.util.Locale.ROOT);
+    }
+
+    private List<HistoryRow> searchConversationFallbackJava(String a,String b,String q,int limit,int offset) throws SQLException {
+        String sql = """
+            SELECT id,sender,recipient,body,created_at
+            FROM messages
+            WHERE (sender=? AND recipient=?) OR (sender=? AND recipient=?)
+            ORDER BY created_at ASC
+            LIMIT ? OFFSET ?
+        """;
+        List<HistoryRow> out = new ArrayList<>();
+        String nq = normalizeAscii(q);
+        int need = limit + offset;
+        int page = Math.max(need * 3, 200);
+        int off = 0;
+        while (out.size() < need) {
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setString(1,a); ps.setString(2,b); ps.setString(3,b); ps.setString(4,a);
+                ps.setInt(5,page); ps.setInt(6,off);
+                try(ResultSet rs=ps.executeQuery()){
+                    boolean any=false;
+                    while(rs.next()){
+                        any=true;
+                        String body=rs.getString("body");
+                        if(normalizeAscii(body).contains(nq)){
+                            out.add(new HistoryRow(
+                                rs.getLong("id"),
+                                rs.getString("sender"),
+                                rs.getString("recipient"),
+                                body,
+                                rs.getTimestamp("created_at")
+                            ));
+                            if(out.size()>=need) break;
+                        }
+                    }
+                    if(!any) break;
+                }
+            }
+            off += page;
+        }
+        if (out.size() <= offset) return Collections.emptyList();
+        return out.subList(offset, Math.min(out.size(), offset+limit));
+    }
 }

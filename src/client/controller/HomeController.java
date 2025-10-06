@@ -1,6 +1,7 @@
 package client.controller;
 
 import client.ClientConnection;
+import client.controller.right.SearchMessageHandler;
 import client.signaling.CallSignalingService;
 import common.Frame;
 import common.User;
@@ -9,6 +10,7 @@ import javafx.animation.Timeline;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
+import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
@@ -53,6 +55,8 @@ public class HomeController {
     @FXML private Button toggleSidebarBtn;
     @FXML private Button searchIconBtn;
     @FXML private Button toggleRightBtn;
+    @FXML private Node rightSearchTrigger;
+
 
 	private HBox leftHeader;
 	private Region leftHeaderSpacer;
@@ -69,14 +73,9 @@ public class HomeController {
     @FXML
     private void initialize() {
         leftCtrl.bind(
-            sidebar,
-            chatList,
-            searchField,
-            titleLabel,
-            toggleSidebarBtn,
-            searchIconBtn,
-            settingsBtn,         
-            leftHeader, leftHeaderSpacer
+            sidebar, chatList, searchField,
+            titleLabel, toggleSidebarBtn, searchIconBtn,
+            settingsBtn, leftHeader, leftHeaderSpacer
         );
         rightCtrl.bind(infoName, chatStatus);
         midCtrl.bind(currentChatName, currentChatStatus, messageContainer, messageField);
@@ -98,7 +97,12 @@ public class HomeController {
         toggleCenterEmpty(true);
         toggleRightEmpty(true);
     }
-
+    
+    @FXML
+    private void onRightSearchClick() {
+        var owner = (centerStack != null) ? centerStack.getScene().getWindow() : null;
+        new SearchMessageHandler(midCtrl).open(owner);
+    }
 
 
     private void toggleCenterEmpty(boolean showEmpty) {

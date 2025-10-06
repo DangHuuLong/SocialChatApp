@@ -476,3 +476,16 @@
   -fx-stroke: #FFFFFF;   
 }
 
+.date-chip {
+  -fx-background-color: transparent;
+  -fx-text-fill: #6B7280;
+  -fx-font-size: 11px;
+  -fx-padding: 6 0 2 0;
+  -fx-alignment: CENTER;
+}
+.date-chip { -fx-text-fill:#6B7280; -fx-font-size:11px; -fx-padding:6 0 4 0; }
+.search-result-row { -fx-spacing:6; }
+
+#searchPanel {
+  -fx-background-color: transparent;
+}

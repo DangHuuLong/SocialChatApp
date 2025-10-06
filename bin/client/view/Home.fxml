@@ -155,8 +155,11 @@
                                 <children><Label text="🔔" style="-fx-font-size: 22px;"/><Label text="Thông báo" style="-fx-font-size: 12px; -fx-text-fill: #374151;"/></children>
                             </VBox>
                             <VBox alignment="CENTER" spacing="4">
-                                <children><Label text="🔍" style="-fx-font-size: 22px;"/><Label text="Tìm kiếm" style="-fx-font-size: 12px; -fx-text-fill: #374151;"/></children>
-                            </VBox>
+							  <children>
+							    <Button fx:id="rightSearchTrigger" text="🔍" onAction="#onRightSearchClick" style="-fx-font-size: 22px; -fx-background-color: transparent; -fx-border-color: transparent; -fx-cursor: hand;"/>
+							    <Label text="Tìm kiếm" style="-fx-font-size: 12px; -fx-text-fill: #374151;"/>
+							  </children>
+							</VBox>
                         </children>
                     </HBox>
 

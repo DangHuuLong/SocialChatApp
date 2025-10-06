@@ -146,7 +146,14 @@ public class ClientConnection {
         f.transferId = String.valueOf(id);
         sendFrame(f);
     }
-
+    
+    public void search(String from, String peer, String query, int limit, int offset) throws IOException {
+        String q = (query == null) ? "" : query;
+        String body = "{\"q\":\"" + q.replace("\\","\\\\").replace("\"","\\\"") + "\",\"offset\":" + Math.max(0, offset) + "}";
+        Frame f = new Frame(common.MessageType.SEARCH, from, peer, body);
+        f.seq = limit;
+        sendFrame(f);
+    }
 
     public synchronized Frame sendFileWithAck(String from, String to, File file, String mimeOrNull, String fileId, long timeoutMs)
             throws Exception {

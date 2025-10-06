@@ -1,10 +1,9 @@
 package client.controller;
 
+import common.User;
 import javafx.scene.control.Label;
 
 import java.time.Instant;
-
-import common.User;
 
 public class RightController {
     private Label infoName;
@@ -15,13 +14,11 @@ public class RightController {
         this.chatStatus = chatStatus;
     }
 
-    // Cập nhật panel phải khi chọn 1 user
     public void showUser(User u, boolean online, String lastSeenIso) {
         if (infoName != null) infoName.setText(u.getUsername());
         applyStatusLabel(chatStatus, online, lastSeenIso);
     }
 
-    // ===== Util =====
     private void applyStatusLabel(Label lbl, boolean online, String lastSeenIso) {
         if (lbl == null) return;
         lbl.getStyleClass().removeAll("chat-status-online", "chat-status-offline");
