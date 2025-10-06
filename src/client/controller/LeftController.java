@@ -235,10 +235,14 @@ public class LeftController {
 
     public void startPollingPresence() {
         stopPolling();
-        poller = new Timeline(new KeyFrame(Duration.seconds(3), e -> refreshPresenceOnce()));
+        poller = new Timeline(new KeyFrame(Duration.seconds(3), e -> {
+            refreshPresenceOnce();
+            refreshUsersDiff();
+        }));
         poller.setCycleCount(Timeline.INDEFINITE);
         poller.play();
         refreshPresenceOnce();
+        refreshUsersDiff();
     }
 
     public void stopPolling() { if (poller != null) { poller.stop(); poller = null; } }
@@ -263,6 +267,40 @@ public class LeftController {
                     }
                 }
             });
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+        }
+    }
+    
+    private void refreshUsersDiff() {
+        if (currentUser == null || chatList == null) return;
+        try {
+            List<User> latest = UserDAO.listOthers(currentUser.getId());
+
+            Set<Integer> latestIds = new HashSet<>();
+            for (User u : latest) {
+                latestIds.add(u.getId());
+                if (!idToUser.containsKey(u.getId())) {
+                    idToUser.put(u.getId(), u);
+                    Platform.runLater(() -> chatList.getChildren().add(createChatItem(u)));
+                } else {
+                    idToUser.put(u.getId(), u);
+                }
+            }
+
+            List<Node> toRemove = new ArrayList<>();
+            for (Node n : chatList.getChildren()) {
+                Object ud = n.getUserData();
+                if (ud instanceof Integer id && !latestIds.contains(id)) {
+                    toRemove.add(n);
+                    lastLabels.remove(id);
+                    idToUser.remove(id);
+                }
+            }
+            if (!toRemove.isEmpty()) {
+                Platform.runLater(() -> chatList.getChildren().removeAll(toRemove));
+            }
+
         } catch (SQLException ex) {
             ex.printStackTrace();
         }
