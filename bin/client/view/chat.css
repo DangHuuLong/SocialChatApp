@@ -489,3 +489,96 @@
 #searchPanel {
   -fx-background-color: transparent;
 }
+
+/* ================== CALL MESSAGE ================== */
+#incoming-call, #outgoing-call {
+  -fx-padding: 10 12;
+  -fx-background-radius: 12;
+  -fx-border-radius: 12;
+}
+#incoming-call {
+  -fx-background-color: -fx-in-bg;
+  -fx-border-color: -fx-in-border;
+  -fx-border-width: 1;
+}
+#outgoing-call {
+  -fx-background-color: -fx-out-bg;
+  -fx-border-color: -fx-out-border;
+  -fx-border-width: 0.5;
+}
+
+.call-row {
+  -fx-spacing: 10;
+  -fx-alignment: CENTER_LEFT;
+}
+.call-icon {
+  -fx-font-size: 18px;
+  -fx-min-width: 24; -fx-pref-width: 24; -fx-alignment: CENTER;
+}
+
+#incoming-call .call-title { -fx-text-fill: -fx-in-text;   -fx-font-size: 14px; -fx-font-weight: bold; }
+#outgoing-call .call-title { -fx-text-fill: -fx-out-text;  -fx-font-size: 14px; -fx-font-weight: bold; }
+
+#incoming-call .call-subtitle { -fx-text-fill: -fx-in-subtle;  -fx-font-size: 11px; }
+#outgoing-call .call-subtitle { -fx-text-fill: -fx-out-subtle; -fx-font-size: 11px; }
+
+.call-redial {
+  -fx-background-radius: 8;
+  -fx-padding: 6 12;
+  -fx-cursor: hand;
+  -fx-border-color: transparent;
+  -fx-min-width: 120;
+  -fx-font-weight: bold;
+  -fx-alignment: CENTER;
+  -fx-margin: 8 0 0 0;
+}
+
+#incoming-call .call-redial {
+  -fx-background-color: #E8F1FF;
+  -fx-text-fill: #0B5ED7;
+}
+#incoming-call .call-redial:hover { -fx-background-color: #DCEAFF; }
+
+#outgoing-call .call-redial {
+  -fx-background-color: rgba(255,255,255,0.25);
+  -fx-text-fill: -fx-out-text;
+}
+#outgoing-call .call-redial:hover { -fx-background-color: rgba(255,255,255,0.35); }
+
+.call-sep {
+  -fx-background-color: rgba(0,0,0,0.06);
+  -fx-min-height: 1; -fx-pref-height: 1; -fx-max-height: 1;
+  -fx-background-insets: 0;
+}
+#outgoing-call .call-sep { -fx-background-color: rgba(255,255,255,0.25); }
+
+/* ================== DARK MODE OVERRIDES ================== */
+.dark #incoming-call {
+  -fx-background-color: -fx-in-bg;
+  -fx-border-color: -fx-in-border;
+}
+.dark #outgoing-call {
+  -fx-background-color: -fx-out-bg;
+  -fx-border-color: -fx-out-border;
+}
+
+.dark #incoming-call .call-title { -fx-text-fill: -fx-in-text; }
+.dark #outgoing-call .call-title { -fx-text-fill: -fx-out-text; }
+
+.dark #incoming-call .call-subtitle { -fx-text-fill: -fx-in-subtle; }
+.dark #outgoing-call .call-subtitle { -fx-text-fill: -fx-out-subtle; }
+
+.dark #incoming-call .call-redial {
+  -fx-background-color: #172033;
+  -fx-text-fill: #CFE1FF;
+}
+.dark #incoming-call .call-redial:hover { -fx-background-color: #1D2A44; }
+
+.dark #outgoing-call .call-redial {
+  -fx-background-color: rgba(255,255,255,0.22);
+  -fx-text-fill: -fx-out-text;
+}
+.dark #outgoing-call .call-redial:hover { -fx-background-color: rgba(255,255,255,0.30); }
+
+.dark #incoming-call .call-sep { -fx-background-color: rgba(255,255,255,0.06); }
+.dark #outgoing-call .call-sep { -fx-background-color: rgba(255,255,255,0.22); }

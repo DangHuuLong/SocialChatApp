@@ -8,23 +8,20 @@ import client.ClientConnection;
 import common.Frame;
 import common.MessageType;
 
-/** Signaling CALL_* qua Frame. */
 public class CallSignalingService {
     private final ClientConnection conn;
     private CallSignalListener listener;
-    private String self; // username hiện tại (để set sender)
+    private String self; 
 
     public CallSignalingService(ClientConnection connection) {
         this.conn = Objects.requireNonNull(connection);
         this.conn.attachCallService(this);
     }
 
-    /** Gọi ngay sau khi login xong để biết "from". */
     public void setSelfUser(String username){ this.self = username; }
 
     public void setListener(CallSignalListener l) { this.listener = l; }
 
-    // ========= Sender APIs =========
     public void sendInvite(String toUser, String callId){
         send(Frame.callNoPayload(MessageType.CALL_INVITE, self, toUser, callId));
     }
@@ -58,8 +55,6 @@ public class CallSignalingService {
         try { conn.sendFrame(f); } catch (Exception e) { e.printStackTrace(); }
     }
 
-    // ========= Receiver (được ClientConnection gọi) =========
-    /** @return true nếu là CALL_* và đã xử lý */
     public boolean tryHandleIncoming(common.Frame f) {
         if (f == null) return false;
         MessageType t = f.type;
@@ -74,7 +69,7 @@ public class CallSignalingService {
             t != MessageType.CALL_ICE) {
             return false;
         }
-        if (listener == null) return true; // nuốt
+        if (listener == null) return true; 
 
         String fromUser = f.sender;
         String callId   = jsonGet(f.body, "callId");
@@ -101,7 +96,6 @@ public class CallSignalingService {
         return new String(Base64.getDecoder().decode(b64), StandardCharsets.UTF_8);
     }
 
-    // JSON mini (khớp util phía server)
     private static String jsonGet(String json, String key) {
         if (json == null) return null;
         String kq = "\"" + key + "\"";

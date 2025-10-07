@@ -86,6 +86,9 @@ public class MidController implements CallSignalListener {
     private final VoiceRecordHandler voiceRecordHandler = new VoiceRecordHandler();
     
     private final ArrayDeque<HBox> pendingOutgoingTexts = new ArrayDeque<>();
+    
+    private final CallHandler callHandler = new CallHandler(this);
+    private final Set<String> shownCallLogs = ConcurrentHashMap.newKeySet();
 
     public void bind(Label currentChatName, Label currentChatStatus, VBox messageContainer, TextField messageField, ImageView midHeaderAvatar) {
         this.currentChatName = currentChatName;
@@ -99,7 +102,7 @@ public class MidController implements CallSignalListener {
 
     public void setRightController(RightController rc) { this.rightController = rc; }
     public void setCurrentUser(User user) { this.currentUser = user; }
-
+    public CallHandler getCallHandler() { return callHandler; }
     public void setConnection(ClientConnection conn) {
         this.connection = conn;
         if (this.connection != null) {
@@ -181,7 +184,10 @@ public class MidController implements CallSignalListener {
         if (text == null) return;
         messageSnapshot.add(new MsgView(System.currentTimeMillis(), incoming, text));
     }
-
+    
+    public boolean markCallLogShownOnce(String callId){
+        return callId != null && shownCallLogs.add(callId);
+    }
     
     private void handleServerFrame(Frame f) {
         new MessageHandler(this).handleServerFrame(f);
@@ -327,6 +333,26 @@ public class MidController implements CallSignalListener {
     private void applyStatusLabel(Label lbl, boolean online, String lastSeenIso) {
         new UIMessageHandler(this).applyStatusLabel(lbl, online, lastSeenIso);
     }
+    
+    public HBox addCallLog(String icon, String title, String subtitle, boolean incoming) {
+        HBox row = new UIMessageHandler(this).addCallLogMessage(icon, title, subtitle, incoming);
+        snapshotText(title + " " + (subtitle == null ? "" : subtitle), incoming);
+        return row;
+    }
+    
+    public static String formatCallDuration(long millis) {
+        long totalSec = Math.max(0, millis / 1000);
+        long h = totalSec / 3600;
+        long m = (totalSec % 3600) / 60;
+        long s = totalSec % 60;
+        if (h > 0) {
+            return h + " giờ " + m + " phút";
+        } else if (m > 0) {
+            return m + " phút " + String.format("%02d", s) + " giây";
+        } else {
+            return s + " giây";
+        }
+    }
 
     public String humanize(String iso, boolean withDot) {
         return new UtilHandler().humanize(iso, withDot);
@@ -340,7 +366,7 @@ public class MidController implements CallSignalListener {
         return UtilHandler.formatDuration(sec);
     }
 
-    private static client.controller.mid.UtilHandler.MediaKind classifyMedia(String mime, String name) {
+    private static UtilHandler.MediaKind classifyMedia(String mime, String name) {
         return UtilHandler.classifyMedia(mime, name);
     }
 
@@ -352,64 +378,25 @@ public class MidController implements CallSignalListener {
         return UtilHandler.guessExt(mime, fallbackName);
     }
 
-    public void callCurrentPeer() {
-        new CallHandler(this).callCurrentPeer();
-    }
-
     public void setCallService(CallSignalingService svc) { this.callSvc = svc; }
+    
+    public void callCurrentPeer() { callHandler.callCurrentPeer(); }
+    public void startCallTo(User peerUser) { callHandler.startCallTo(peerUser); }
 
-    public void startCallTo(User peerUser) {
-        new CallHandler(this).startCallTo(peerUser);
-    }
-
-    @Override
-    public void onInvite(String fromUser, String callId) {
-        new CallHandler(this).onInvite(fromUser, callId);
-    }
-    @Override
-    public void onAccept(String fromUser, String callId) {
-        new CallHandler(this).onAccept(fromUser, callId);
-    }
-    @Override
-    public void onReject(String fromUser, String callId) {
-        new CallHandler(this).onReject(fromUser, callId);
-    }
-    @Override
-    public void onCancel(String fromUser, String callId) {
-        new CallHandler(this).onCancel(fromUser, callId);
-    }
-    @Override
-    public void onBusy(String fromUser, String callId) {
-        new CallHandler(this).onBusy(fromUser, callId);
-    }
-    @Override
-    public void onEnd(String fromUser, String callId) {
-        new CallHandler(this).onEnd(fromUser, callId);
-    }
-    @Override
-    public void onOffline(String toUser, String callId) {
-        new CallHandler(this).onOffline(toUser, callId);
-    }
-    @Override
-    public void onOffer(String fromUser, String callId, String sdpJson) {
-        new CallHandler(this).onOffer(fromUser, callId, sdpJson);
-    }
-    @Override
-    public void onAnswer(String fromUser, String callId, String sdpJson) {
-        new CallHandler(this).onAnswer(fromUser, callId, sdpJson);
-    }
+    @Override public void onInvite (String fromUser, String callId){ callHandler.onInvite(fromUser, callId); }
+    @Override public void onAccept (String fromUser, String callId){ callHandler.onAccept(fromUser, callId); }
+    @Override public void onReject (String fromUser, String callId){ callHandler.onReject(fromUser, callId); }
+    @Override public void onCancel (String fromUser, String callId){ callHandler.onCancel(fromUser, callId); }
+    @Override public void onBusy   (String fromUser, String callId){ callHandler.onBusy(fromUser, callId); }
+    @Override public void onEnd    (String fromUser, String callId){ callHandler.onEnd(fromUser, callId); }
+    @Override public void onOffline(String toUser , String callId){ callHandler.onOffline(toUser, callId); }
+    @Override public void onOffer  (String fromUser, String callId, String sdp){ callHandler.onOffer(fromUser, callId, sdp); }
+    @Override public void onAnswer (String fromUser, String callId, String sdp){ callHandler.onAnswer(fromUser, callId, sdp); }
     @Override
     public void onIce(String from, String id, String c) {
-        new CallHandler(this).onIce(from, id, c);
+        callHandler.onIce(from, id, c);
     }
 
-    private void openCallWindow(String peer, String callId, VideoCallController.Mode mode) {
-        new CallHandler(this).openCallWindow(peer, callId, mode);
-    }
-
-    private void closeCallWindow() {
-        new CallHandler(this).closeCallWindow();
-    }
 
     public void showVoiceRecordDialog(Window owner, AudioFormat format, File audioFile, Consumer<byte[]> onComplete) {
         voiceRecordHandler.showVoiceRecordDialog(owner, format, audioFile, onComplete);

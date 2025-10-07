@@ -57,13 +57,11 @@ public class VideoCallController {
                 ? "?" : String.valueOf(Character.toUpperCase(peer.charAt(0)));
         avatarLabel.setText(initials);
 
-        // Bind kích thước khung lớn theo container
         remoteVideo.setPreserveRatio(true);
         remoteVideo.setSmooth(true);
         remoteVideo.fitWidthProperty().bind(videoStack.widthProperty());
         remoteVideo.fitHeightProperty().bind(videoStack.heightProperty());
 
-        // PIP cố định
         localPreview.setPreserveRatio(true);
         localPreview.setSmooth(true);
         localPreview.setFitWidth(240);
@@ -113,21 +111,16 @@ public class VideoCallController {
     }
 
     private void wireButtons() {
-        if (acceptBtn != null) acceptBtn.setOnAction(e -> {
-            callSvc.sendAccept(peer, callId);
-            setMode(Mode.CONNECTING);
-        });
-        if (rejectBtn != null) rejectBtn.setOnAction(e -> { callSvc.sendReject(peer, callId); safeClose(); });
-        if (cancelBtn != null) cancelBtn.setOnAction(e -> { callSvc.sendCancel(peer, callId); safeClose(); });
-        if (hangupBtn != null) hangupBtn.setOnAction(e -> { callSvc.sendEnd(peer, callId); safeClose(); });
+        if (acceptBtn != null) acceptBtn.setOnAction(e -> { callSvc.sendAccept(peer, callId); setMode(Mode.CONNECTING); });
+        if (rejectBtn != null) rejectBtn.setOnAction(e -> controller.getCallHandler().localRejectIncoming());
+        if (cancelBtn != null) cancelBtn.setOnAction(e -> controller.getCallHandler().localCancelBeforeConnect());
+        if (hangupBtn != null) hangupBtn.setOnAction(e -> controller.getCallHandler().localEndAfterConnect());
     }
 
-    /** MidController sẽ đóng Stage thật khi END. */
     public void safeClose() {
         if (onCloseWindow != null) Platform.runLater(onCloseWindow);
     }
 
-    // === Getters để LanVideoSession set hình ===
     public ImageView getRemoteView() { return remoteVideo; }
     public ImageView getLocalView()  { return localPreview; }
     

@@ -6,20 +6,10 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.geometry.Side;
 import javafx.scene.Node;
-import javafx.scene.control.Button;
-import javafx.scene.control.ContextMenu;
-import javafx.scene.control.Label;
-import javafx.scene.control.MenuItem;
-import javafx.scene.control.ScrollPane;
-import javafx.scene.control.Slider;
-import javafx.scene.control.TextInputDialog;
+import javafx.scene.control.*;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
-import javafx.scene.layout.HBox;
-import javafx.scene.layout.Priority;
-import javafx.scene.layout.Region;
-import javafx.scene.layout.StackPane;
-import javafx.scene.layout.VBox;
+import javafx.scene.layout.*;
 import javafx.util.Duration;
 
 import client.controller.MidController;
@@ -101,7 +91,6 @@ public class UIMessageHandler {
                 String trimmed = (newText == null) ? "" : newText.trim();
                 if (trimmed.isEmpty() || trimmed.equals(current)) return;
 
-                // Optimistic UI
                 labelRef.setText(trimmed);
 
                 try {
@@ -146,7 +135,6 @@ public class UIMessageHandler {
 
         if (messageId != null) row.setUserData(messageId);
     }
-
 
     private void scrollToBottom() {
         var n = controller.getMessageContainer();
@@ -236,17 +224,9 @@ public class UIMessageHandler {
         return addRowWithBubble(box, incoming, messageId);
     }
 
-    public HBox addTextMessage(String text, boolean incoming) {
-        return addTextMessage(text, incoming, (String) null);
-    }
-
-    public HBox addImageMessage(Image img, String caption, boolean incoming) {
-        return addImageMessage(img, caption, incoming, (String) null);
-    }
-
-    public HBox addFileMessage(String filename, String meta, boolean incoming) {
-        return addFileMessage(filename, meta, incoming, (String) null);
-    }
+    public HBox addTextMessage(String text, boolean incoming) { return addTextMessage(text, incoming, (String) null); }
+    public HBox addImageMessage(Image img, String caption, boolean incoming) { return addImageMessage(img, caption, incoming, (String) null); }
+    public HBox addFileMessage(String filename, String meta, boolean incoming) { return addFileMessage(filename, meta, incoming, (String) null); }
 
     public HBox addVoiceMessage(String duration, boolean incoming, String fileId) {
         if (controller.getMessageContainer().getChildren().size() > 100) {
@@ -355,4 +335,37 @@ public class UIMessageHandler {
         return null;
     }
 
+    public HBox addCallLogMessage(String iconText, String title, String subtitle, boolean incoming) {
+        VBox box = new VBox(8);
+        box.setId(incoming ? "incoming-call" : "outgoing-call");
+        box.setMaxWidth(420);
+
+        HBox rowTop = new HBox(10);
+        rowTop.getStyleClass().add("call-row");
+        Label icon = new Label(iconText == null || iconText.isBlank() ? "🎥" : iconText);
+        icon.getStyleClass().add("call-icon");
+
+        VBox texts = new VBox(2);
+        Label t1 = new Label(title == null ? "" : title);
+        t1.getStyleClass().add("call-title");
+        Label t2 = new Label(subtitle == null ? "" : subtitle);
+        t2.getStyleClass().add("call-subtitle");
+        texts.getChildren().addAll(t1, t2);
+
+        Region grow = new Region();
+        HBox.setHgrow(grow, Priority.ALWAYS);
+
+        rowTop.getChildren().addAll(icon, texts, grow);
+
+        Region sep = new Region();
+        sep.getStyleClass().add("call-sep");
+
+        Button redial = new Button("Gọi lại");
+        redial.getStyleClass().add("call-redial");
+        redial.setOnAction(e -> controller.callCurrentPeer());
+
+        box.getChildren().addAll(rowTop, sep, redial);
+
+        return addRowWithBubble(box, incoming, (String) null);
+    }
 }

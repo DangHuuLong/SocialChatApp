@@ -1,7 +1,6 @@
 package client.controller.mid;
 
 import common.Frame;
-import common.MessageType;
 import javafx.application.Platform;
 import javafx.scene.layout.HBox;
 import java.io.BufferedOutputStream;
@@ -9,6 +8,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
+
 import javafx.scene.image.Image;
 import javafx.scene.image.WritableImage;
 import client.controller.MidController;
@@ -16,6 +16,8 @@ import client.controller.mid.UtilHandler.MediaKind;
 
 public class MessageHandler {
     private final MidController controller;
+    private static final java.util.Set<String> renderedCallLogIds =
+            java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
 
     public MessageHandler(MidController controller) {
         this.controller = controller;
@@ -28,28 +30,57 @@ public class MessageHandler {
         switch (f.type) {
             case DM -> {
                 String sender = f.sender;
-                String body = f.body;
+                String body = f.body == null ? "" : f.body;
+
+                if (body.startsWith("[CALLLOG]")) {
+                    if (openPeer != null && openPeer.equals(sender)) {
+                        CallLogData d = parseCallLog(body);
+                        renderCallLogOnce(d, true);
+                    }
+                    break;
+                }
+
                 if (openPeer != null && openPeer.equals(sender)) {
                     controller.addTextMessage(body, true, f.transferId);
                 }
             }
+
             case HISTORY -> {
                 String line = f.body == null ? "" : f.body.trim();
+
                 if (line.startsWith("[HIST IN]")) {
                     String payload = line.substring(9).trim();
                     int p = payload.indexOf(": ");
                     if (p > 0) {
                         String sender = payload.substring(0, p);
                         String body = payload.substring(p + 2);
+
+                        if (body.startsWith("[CALLLOG]")) {
+                            if (openPeer != null && openPeer.equals(sender)) {
+                                CallLogData d = parseCallLog(body);
+                                renderCallLogOnce(d, true);
+                            }
+                            break;
+                        }
+
                         if (openPeer != null && openPeer.equals(sender)) {
                             controller.addTextMessage(body, true, f.transferId);
                         }
                     }
+
                 } else if (line.startsWith("[HIST OUT]")) {
                     String body = line.substring(10).trim();
+
+                    if (body.startsWith("[CALLLOG]")) {
+                        CallLogData d = parseCallLog(body);
+                        renderCallLogOnce(d, false);
+                        break;
+                    }
+
                     controller.addTextMessage(body, false, f.transferId);
                 }
             }
+
             case FILE_EVT, AUDIO_EVT -> {
                 String json = f.body == null ? "" : f.body;
                 String from = UtilHandler.jsonGet(json, "from");
@@ -90,6 +121,7 @@ public class MessageHandler {
                     controller.getPendingFileEvents().computeIfAbsent(from, k -> new ArrayList<>()).add(f);
                 }
             }
+
             case FILE_META -> {
                 String body = f.body == null ? "" : f.body;
                 String mime = UtilHandler.jsonGet(body, "mime");
@@ -107,6 +139,7 @@ public class MessageHandler {
                     System.err.println("[DL] open failed: " + ex.getMessage());
                 }
             }
+
             case FILE_CHUNK -> {
                 String fid = f.transferId;
                 byte[] data = (f.bin == null) ? new byte[0] : f.bin;
@@ -118,10 +151,7 @@ public class MessageHandler {
                         System.err.println("[DL] write failed: " + e.getMessage());
                     }
                     if (f.last) {
-                        try {
-                            bos.flush();
-                            bos.close();
-                        } catch (Exception ignore) {}
+                        try { bos.flush(); bos.close(); } catch (Exception ignore) {}
                         controller.getDlOut().remove(fid);
                         File file = controller.getDlPath().remove(fid);
                         if (file != null) {
@@ -146,12 +176,14 @@ public class MessageHandler {
                     }
                 }
             }
+
             case DELETE_MSG -> {
                 String id = f.transferId;
                 if (id != null) {
                     Platform.runLater(() -> controller.removeMessageById(id));
                 }
             }
+
             case EDIT_MSG -> {
                 String id = f.transferId;
                 String newBody = (f.body == null) ? "" : f.body;
@@ -166,6 +198,7 @@ public class MessageHandler {
                     controller.tagNextPendingOutgoing(f.transferId);
                 }
             }
+
             case ERROR -> Platform.runLater(() -> controller.showErrorAlert("Lỗi: " + f.body));
         }
     }
@@ -185,9 +218,62 @@ public class MessageHandler {
             }
         }
 
-        HBox row = controller.addTextMessage(text, false); 
-        controller.enqueuePendingOutgoing(row);           
+        HBox row = controller.addTextMessage(text, false);
+        controller.enqueuePendingOutgoing(row);
         controller.getMessageField().clear();
     }
 
+    private static final class CallLogData {
+        final String icon, title, subtitle, callId, caller, callee;
+        CallLogData(String icon, String title, String subtitle, String callId, String caller, String callee) {
+            this.icon = icon; this.title = title; this.subtitle = subtitle;
+            this.callId = callId; this.caller = caller; this.callee = callee;
+        }
+    }
+
+    private static CallLogData parseCallLog(String body) {
+        try {
+            int i = body.indexOf('{');
+            if (!body.startsWith("[CALLLOG]") || i < 0) return null;
+            String json = body.substring(i);
+            String icon     = UtilHandler.jsonGet(json, "icon");
+            String title    = UtilHandler.jsonGet(json, "title");
+            String subtitle = UtilHandler.jsonGet(json, "subtitle");
+            String callId   = UtilHandler.jsonGet(json, "callId");
+            String caller   = UtilHandler.jsonGet(json, "caller");
+            String callee   = UtilHandler.jsonGet(json, "callee");
+            if (title == null) title = "";
+            if (subtitle == null) subtitle = "";
+            if (icon == null || icon.isBlank()) icon = "🎥";
+            return new CallLogData(icon, title, subtitle, callId, caller, callee);
+        } catch (Exception ignore) {
+            return null;
+        }
+    }
+
+    private boolean isIncomingForThisClient(CallLogData d) {
+        String me = (controller.getCurrentUser() != null)
+                ? controller.getCurrentUser().getUsername() : null;
+        if (me == null) return true;
+        if (d == null)  return true;
+
+        if (d.caller != null && !d.caller.isBlank()) {
+            return !me.equals(d.caller);
+        }
+        if (d.callee != null && !d.callee.isBlank()) {
+            return me.equals(d.callee);
+        }
+        return true;
+    }
+
+    private void renderCallLogOnce(CallLogData d, boolean defaultIncoming) {
+        if (d == null) return;
+        if (d.callId != null && !d.callId.isBlank()) {
+            if (!renderedCallLogIds.add(d.callId)) return;
+        }
+        boolean incoming = (d.caller != null || d.callee != null)
+                ? isIncomingForThisClient(d)
+                : defaultIncoming;
+        controller.addCallLog(d.icon, d.title, d.subtitle, incoming);
+    }
 }
