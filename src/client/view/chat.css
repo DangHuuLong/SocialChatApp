@@ -1,0 +1,379 @@
+/* ======================= THEME & PANEL ======================= */
+.root-bg {
+    -fx-background-color: #F4F8FF;
+    -fx-in-bg: #E5EEFF;
+    -fx-in-border: #DDE9FF;
+    -fx-in-text: #111827;
+    -fx-in-subtle: #6B7280;
+    -fx-out-bg: #1882FF;
+    -fx-out-border: rgba(255,255,255,0.25);
+    -fx-out-text: white;
+    -fx-out-subtle: rgba(255,255,255,0.85);
+}
+.panel {
+    -fx-background-color: white;
+    -fx-background-radius: 14;
+    -fx-border-color: #D9E6FF;
+    -fx-border-width: 1;
+    -fx-border-radius: 14;
+    -fx-effect: dropshadow(gaussian, rgba(24,130,255,0.08), 12, 0.2, 0, 2);
+}
+
+/* ======================= LEFT SIDEBAR ======================= */
+.sidebar { -fx-padding: 12; }
+
+/* chiều rộng khi thu nhỏ */
+.sidebar.collapsed {
+    -fx-min-width: 96;
+    -fx-pref-width: 96;
+    -fx-max-width: 96;
+    -fx-padding: 12 8 12 8;
+}
+
+/* icon vuông: toggle, search (và logout dạng compact) */
+.side-icon {
+    -fx-min-width: 40; -fx-pref-width: 40; -fx-max-width: 40;
+    -fx-min-height: 40; -fx-pref-height: 40; -fx-max-height: 40;
+    -fx-background-color: transparent;
+    -fx-background-radius: 8;
+    -fx-font-size: 16px;
+    -fx-padding: 0;
+}
+.side-icon:hover { -fx-background-color: rgba(0,0,0,0.05); -fx-cursor: hand; }
+
+/* logout luôn đỏ ở mọi trạng thái */
+.logout-btn {
+    -fx-background-color: #EF4444;
+    -fx-text-fill: white;
+    -fx-background-radius: 8;
+    -fx-padding: 8 12;
+    -fx-cursor: hand;
+    -fx-border-color: transparent;
+}
+.logout-btn:hover { -fx-background-color: #DC2626; }
+
+/* logout dạng icon-only khi thu nhỏ (chỉ đổi kích thước, KHÔNG đổi màu) */
+.logout-compact {
+    -fx-padding: 0;
+    -fx-min-width: 40; -fx-pref-width: 40; -fx-max-width: 40;
+    -fx-min-height: 40; -fx-pref-height: 40; -fx-max-height: 40;
+}
+
+/* list & item */
+.list-scroll { -fx-background-color: transparent; }
+.list-scroll .scroll-bar:horizontal { -fx-opacity: 0; -fx-pref-height: 0; }
+.sidebar.collapsed .list-scroll .viewport > .content { -fx-padding: 4 8 4 12; }
+
+.chat-item {
+    -fx-background-color: #ffffff;
+    -fx-background-radius: 10;
+    -fx-padding: 8;
+    -fx-cursor: hand;
+}
+.chat-item:hover { -fx-background-color: #EFF6FF; }
+.sidebar.collapsed .chat-item { -fx-padding: 4; -fx-background-insets: 0; -fx-spacing: 0; }
+
+.panel-title { -fx-font-size: 16px; -fx-font-weight: bold; }
+.search-field {
+    -fx-background-radius: 8;
+    -fx-border-radius: 8;
+    -fx-border-color: #C6DAFF;
+    -fx-border-width: 1;
+    -fx-padding: 8 10 8 10;
+}
+.search-field:focused {
+    -fx-border-color: #1882FF;
+    -fx-effect: dropshadow(gaussian, rgba(24,130,255,0.25), 8, 0.2, 0, 0);
+}
+.chat-name { -fx-font-weight: bold; -fx-text-fill: #0F172A; }
+.chat-last { -fx-text-fill: #6B7280; -fx-font-size: 12px; }
+
+/* ======================= CENTER AREA ======================= */
+.center-panel {}
+.chat-header {
+    -fx-background-color: linear-gradient(to bottom, #FFFFFF, #F9FBFF);
+    -fx-background-radius: 12;
+    -fx-border-color: #E3EEFF;
+    -fx-border-radius: 12;
+}
+.chat-title { -fx-font-size: 16px; -fx-font-weight: bold; }
+.chat-status-online { -fx-text-fill: #16A34A; -fx-font-size: 12px; }
+.chat-status-offline { -fx-text-fill: #9CA3AF; -fx-font-size: 12px; }
+.action-btn {
+    -fx-background-color: #E8F1FF;
+    -fx-text-fill: #0B5ED7;
+    -fx-background-radius: 8;
+    -fx-padding: 6 12;
+    -fx-cursor: hand;
+    -fx-border-color: transparent;
+}
+.action-btn:hover { -fx-background-color: #DCEAFF; }
+.message-scroll { -fx-background-color: transparent; }
+.placeholder { -fx-text-fill: #9CA3AF; }
+.input-bar {
+    -fx-background-color: #F7FAFF;
+    -fx-background-radius: 12;
+    -fx-border-color: #E3EEFF;
+    -fx-border-radius: 12;
+}
+.icon-btn {
+    -fx-background-color: #E8F1FF;
+    -fx-background-radius: 8;
+    -fx-padding: 6 10;
+    -fx-cursor: hand;
+    -fx-border-color: transparent;
+}
+.icon-btn:hover { -fx-background-color: #DCEAFF; }
+.send-btn {
+    -fx-background-color: #1882FF;
+    -fx-text-fill: white;
+    -fx-background-radius: 8;
+    -fx-padding: 6 16;
+    -fx-cursor: hand;
+    -fx-border-color: transparent;
+}
+.send-btn:hover { -fx-background-color: #0F6FDE; }
+
+.button.msg-menu {
+  -fx-background-color: transparent;
+  -fx-text-fill: -fx-accent;
+  -fx-font-size: 14px;
+  -fx-padding: 2 6 2 6;
+}
+.button.msg-menu:hover {
+  -fx-background-color: rgba(0,0,0,0.06);
+  -fx-background-radius: 6;
+}
+
+/* Context menu (nhẹ, không chói) */
+.context-menu.msg-context {
+  -fx-background-color: white;
+  -fx-background-radius: 8;
+  -fx-background-insets: 0;
+  -fx-padding: 6 4;
+  -fx-effect: dropshadow(gaussian, rgba(0,0,0,.20), 12, 0.2, 0, 2);
+}
+
+/* Base cho tất cả menu items */
+.menu-item.msg-context-item,
+.menu-item.msg-context-item-danger {
+  -fx-padding: 6 12;
+  -fx-background-color: transparent;
+}
+
+/* Chữ “bình thường” */
+.menu-item.msg-context-item .label {
+  -fx-font-size: 12px;
+  -fx-text-fill: #111827; /* đen xám */
+}
+
+/* Chữ “nguy hiểm” */
+.menu-item.msg-context-item-danger .label {
+  -fx-font-size: 12px;
+  -fx-text-fill: #DC2626; /* đỏ hơi trầm */
+}
+
+/* Hover + Focused/Armed – chỉ nền xám rất nhẹ, KHÔNG đổi sang xanh/đỏ chói */
+.menu-item.msg-context-item:hover,
+.menu-item.msg-context-item:focused,
+.menu-item.msg-context-item:armed {
+  -fx-background-color: rgba(0,0,0,0.06);
+  -fx-background-radius: 6;
+}
+.menu-item.msg-context-item:hover .label,
+.menu-item.msg-context-item:focused .label,
+.menu-item.msg-context-item:armed .label {
+  -fx-text-fill: #111827;
+}
+
+.menu-item.msg-context-item-danger:hover,
+.menu-item.msg-context-item-danger:focused,
+.menu-item.msg-context-item-danger:armed {
+  -fx-background-color: rgba(220,38,38,0.06); /* xám-đỏ rất nhẹ */
+  -fx-background-radius: 6;
+}
+.menu-item.msg-context-item-danger:hover .label,
+.menu-item.msg-context-item-danger:focused .label,
+.menu-item.msg-context-item-danger:armed .label {
+  -fx-text-fill: #B91C1C; /* đỏ đậm hơn 1 chút */
+}
+
+/* Dialog chỉnh sửa */
+.dialog-pane.msg-edit-dialog {
+  -fx-background-color: white;
+  -fx-background-radius: 12;
+}
+.dialog-pane.msg-edit-dialog .header-panel { -fx-padding: 6 12; }
+.dialog-pane.msg-edit-dialog .content { -fx-padding: 12; }
+.dialog-pane.msg-edit-dialog .button-bar .button {
+  -fx-background-radius: 8;
+}
+
+
+/* ======================= RIGHT PANEL ======================= */
+.info-panel {}
+.info-header { -fx-padding: 8 0 4 0; }
+.info-name { -fx-font-size: 15px; -fx-font-weight: bold; }
+.menu-item {
+    -fx-background-color: transparent;
+    -fx-text-fill: #0F172A;
+    -fx-padding: 10 12;
+    -fx-background-radius: 8;
+    -fx-cursor: hand;
+    -fx-border-color: transparent;
+}
+.menu-item:hover { -fx-background-color: #EFF6FF; }
+
+/* ======================= BUBBLES (IN/OUT) ======================= */
+.root {
+    -fx-in-bg: #E5EEFF;
+    -fx-in-border: #DDE9FF;
+    -fx-in-text: #111827;
+    -fx-in-subtle: #6B7280;
+    -fx-out-bg: #1882FF;
+    -fx-out-border: rgba(255,255,255,0.25);
+    -fx-out-text: white;
+    -fx-out-subtle: rgba(255,255,255,0.85);
+}
+#incoming-text, #incoming-image, #incoming-file, #incoming-voice, #incoming-video {
+    -fx-background-color: -fx-in-bg;
+    -fx-background-radius: 12;
+    -fx-border-color: -fx-in-border;
+    -fx-border-width: 1;
+    -fx-border-radius: 12;
+}
+#outgoing-text, #outgoing-image, #outgoing-file, #outgoing-voice, #outgoing-video {
+    -fx-background-color: -fx-out-bg;
+    -fx-background-radius: 12;
+    -fx-border-color: -fx-out-border;
+    -fx-border-width: 0.5;
+    -fx-border-radius: 12;
+}
+#incoming-text, #outgoing-text { -fx-padding: 8 12; -fx-background-radius: 14; -fx-border-radius: 14; }
+#incoming-text Label { -fx-text-fill: -fx-in-text; -fx-font-size: 14px; }
+#outgoing-text Label { -fx-text-fill: -fx-out-text; -fx-font-size: 14px; }
+
+#incoming-image, #outgoing-image { -fx-padding: 6; }
+#incoming-image Label { -fx-text-fill: -fx-in-subtle; -fx-font-size: 11px; }
+#outgoing-image Label { -fx-text-fill: -fx-out-subtle; -fx-font-size: 11px; }
+
+#incoming-file, #outgoing-file { -fx-padding: 10 12; }
+#incoming-file .file-name { -fx-font-weight: bold; -fx-text-fill: #0F172A; }
+#outgoing-file .file-name { -fx-font-weight: bold; -fx-text-fill: white; }
+#incoming-file .meta { -fx-font-size: 11px; -fx-text-fill: -fx-in-subtle; }
+#outgoing-file .meta { -fx-font-size: 11px; -fx-text-fill: -fx-out-subtle; }
+
+#incoming-voice, #outgoing-voice { -fx-padding: 8 12; }
+#incoming-voice Label { -fx-text-fill: -fx-in-text; -fx-font-size: 11px; }
+#outgoing-voice Label { -fx-text-fill: -fx-out-text; -fx-font-size: 11px; }
+#incoming-voice .audio-btn { -fx-background-color: rgba(0,0,0,0.05); -fx-text-fill: -fx-in-text; }
+#outgoing-voice .audio-btn { -fx-background-color: rgba(255,255,255,0.25); -fx-text-fill: -fx-out-text; }
+
+#incoming-video, #outgoing-video { -fx-padding: 8 12; }
+#incoming-video Label { -fx-text-fill: -fx-in-subtle; -fx-font-size: 11px; }
+#outgoing-video Label { -fx-text-fill: -fx-out-subtle; -fx-font-size: 11px; }
+#incoming-video Button, #outgoing-video Button { -fx-background-radius: 8; -fx-padding: 4 10; }
+#incoming-video Button { -fx-background-color: rgba(0,0,0,0.05); -fx-text-fill: -fx-in-text; }
+#outgoing-video Button { -fx-background-color: rgba(255,255,255,0.25); -fx-text-fill: -fx-out-text; }
+#incoming-video Slider, #outgoing-video Slider { -fx-pref-width: 220; }
+
+.msg-menu {
+  -fx-background-color: transparent;
+  -fx-background-radius: 6;
+  -fx-padding: 2 6 2 6;
+  -fx-cursor: hand;
+  -fx-text-fill: #6B7280;
+  -fx-font-weight: bold;
+}
+.msg-menu:hover {
+  -fx-background-color: rgba(0,0,0,0.06);
+  -fx-text-fill: #111827;
+}
+
+
+/* ======================= ACCORDION (RIGHT) ======================= */
+.accordion { -fx-background-color: transparent; }
+.menu-pane {
+    -fx-background-radius: 10;
+    -fx-border-radius: 10;
+    -fx-border-color: #D9E6FF;
+    -fx-border-width: 1;
+    -fx-padding: 0;
+    -fx-background-color: white;
+    -fx-effect: dropshadow(gaussian, rgba(24,130,255,0.08), 8, 0.2, 0, 1);
+}
+.menu-pane > .title {
+    -fx-background-color: #F4F8FF;
+    -fx-background-insets: 0;
+    -fx-background-radius: 10 10 0 0;
+    -fx-padding: 10 12;
+    -fx-font-weight: bold;
+    -fx-text-fill: #0F172A;
+    -fx-cursor: hand;
+}
+.menu-pane > .title:hover { -fx-background-color: #EFF6FF; }
+.menu-pane > *.content {
+    -fx-background-color: white;
+    -fx-background-insets: 0;
+    -fx-background-radius: 0 0 10 10;
+    -fx-padding: 8 12 10 12;
+    -fx-border-color: transparent;
+}
+.submenu { -fx-padding: 0 0 0 8; }
+.submenu-item { -fx-text-fill: #374151; -fx-font-size: 13px; -fx-padding: 6 4; -fx-background-radius: 6; }
+.submenu-item:hover { -fx-background-color: #EFF6FF; -fx-text-fill: #1882FF; }
+
+.empty-state { -fx-background-color: #f3f4f6; -fx-padding: 16; }
+.empty-title { -fx-font-size: 16px; -fx-text-fill: #111827; -fx-font-weight: bold; }
+.empty-subtitle { -fx-font-size: 12px; -fx-text-fill: #6b7280; }
+
+/* ======================= CALL WINDOW ======================= */
+#call-card {
+  -fx-background-color: white;
+  -fx-background-radius: 0;
+  -fx-padding: 12;
+  -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.18), 24, 0.25, 0, 8);
+}
+#call-title { -fx-font-size: 18px; -fx-font-weight: 800; -fx-text-fill: #111827; }
+#call-subtitle { -fx-font-size: 13px; -fx-text-fill: #6B7280; }
+#avatar {
+  -fx-min-width: 56; -fx-min-height: 56;
+  -fx-alignment: center;
+  -fx-background-radius: 0;
+  -fx-text-fill: white;
+  -fx-font-size: 18px; -fx-font-weight: 800;
+  -fx-background-color: linear-gradient(to bottom right, #60A5FA, #2563EB);
+}
+.video-area {
+  -fx-background-color: linear-gradient(to bottom right, #f8fafc, #eef2f7);
+  -fx-background-radius: 0;
+  -fx-border-color: #e5e7eb;
+  -fx-border-radius: 0;
+}
+#btn { -fx-background-radius: 0; -fx-padding: 10 18; -fx-font-weight: 700; }
+#btn-accept { -fx-background-color: #10B981; -fx-text-fill: white; }
+#btn-accept:hover { -fx-background-color: #0EA371; }
+#btn-reject, .btn-hangup { -fx-background-color: #EF4444; -fx-text-fill: white; }
+#btn-reject:hover, .btn-hangup:hover { -fx-background-color: #DC2626; }
+#btn-cancel {
+  -fx-background-radius: 0;
+  -fx-background-color: transparent; -fx-text-fill: #374151;
+  -fx-border-color: #D1D5DB; -fx-border-radius: 0; -fx-padding: 9 17;
+}
+#btn-cancel:hover { -fx-background-color: #F3F4F6; }
+#call-actions > .button { -fx-min-width: 130; }
+
+/* ======================= VOICE RECORD ======================= */
+#voice-dialog { -fx-background-color: #FFFFFF; -fx-border-color: #D1D5DB; -fx-border-radius: 8; -fx-background-radius: 8; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.2), 10, 0, 0, 2); }
+#mic-icon { -fx-font-size: 48px; -fx-text-fill: #EF4444; }
+#status-label { -fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: #1F2937; }
+#timer-label { -fx-font-size: 24px; -fx-font-weight: bold; -fx-text-fill: #EF4444; }
+#wave-bar-0, #wave-bar-1, #wave-bar-2, #wave-bar-3, #wave-bar-4 { -fx-fill: #EF4444; }
+#stop-button { -fx-background-color: #EF4444; -fx-text-fill: white; -fx-background-radius: 50; -fx-padding: 10 20; -fx-font-size: 14px; -fx-cursor: hand; }
+#stop-button:hover { -fx-background-color: #DC2626; }
+#cancel-button { -fx-background-color: #6B7280; -fx-text-fill: white; -fx-background-radius: 50; -fx-padding: 10 20; -fx-font-size: 14px; -fx-cursor: hand; }
+#cancel-button:hover { -fx-background-color: #4B5563; }
+#play-button { -fx-background-color: #10B981; -fx-text-fill: white; -fx-background-radius: 50; -fx-padding: 10 20; -fx-font-size: 14px; -fx-cursor: hand; }
+#play-button:hover { -fx-background-color: #059669; }
+#send-button { -fx-background-color: #3B82F6; -fx-text-fill: white; -fx-background-radius: 50; -fx-padding: 10 20; -fx-font-size: 14px; -fx-cursor: hand; }
+#send-button:hover { -fx-background-color: #2563EB; }
