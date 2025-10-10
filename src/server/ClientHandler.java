@@ -5,12 +5,14 @@ import server.signaling.CallRouter;
 import common.Frame;
 import common.FrameIO;
 import common.MessageType;
+import server.dao.FileDao;
 
 import java.io.*;
 import java.net.Socket;
 import java.net.SocketException;
 import java.sql.SQLException;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -20,6 +22,7 @@ public class ClientHandler implements Runnable {
     private final Set<ClientHandler> clients;
     private final Map<String, ClientHandler> online;
     private final MessageDao messageDao;
+    private final FileDao fileDao;
 
     private DataInputStream binIn;
     private DataOutputStream binOut;
@@ -41,11 +44,12 @@ public class ClientHandler implements Runnable {
     public ClientHandler(Socket socket,
                          Set<ClientHandler> clients,
                          Map<String, ClientHandler> online,
-                         MessageDao messageDao) {
+                         MessageDao messageDao, FileDao fileDao) {
         this.socket = socket;
         this.clients = clients;
         this.online = online;
         this.messageDao = messageDao;
+        this.fileDao = fileDao;
     }
 
     @Override
@@ -77,6 +81,12 @@ public class ClientHandler implements Runnable {
                     case DOWNLOAD_FILE -> handleDownloadFiles(f);
                     case EDIT_MSG -> handleEditMessage(f);
                     case SEARCH -> handleSearch(f);
+                    case FILE_HISTORY -> handleFileHistory(f);
+                    case DELETE_FILE -> handleDeleteFile(f);
+                    case AUDIO_HISTORY -> handleAudioHistory(f);
+                    case DOWNLOAD_AUDIO -> handleDownloadAudio(f);
+                    case DELETE_AUDIO -> handleDeleteAudio(f);
+
                     default -> System.out.println("[SERVER] Unknown frame: " + f.type);
                 }
             }
@@ -157,6 +167,23 @@ public class ClientHandler implements Runnable {
                 return;
             }
             String peer = messageDao.deleteByIdReturningPeer(id, username);
+            try {
+                var fileRow = fileDao.getFileByMessageId(id);
+                if (fileRow != null) {
+                    // Delete from DB
+                    fileDao.deleteFileByMessageId(id);
+                    // Delete actual file
+                    File toDelete = new File(fileRow.filePath);
+                    if (toDelete.exists() && toDelete.delete()) {
+                        System.out.println("[FILE] Deleted " + toDelete.getName());
+                    } else {
+                        System.out.println("[FILE] No file to delete for messageId=" + id);
+                    }
+                }
+            } catch (SQLException ex) {
+                System.err.println("[DB] Could not delete file metadata for msgId=" + id + ": " + ex.getMessage());
+            }
+
             if (peer == null) {
                 sendFrame(Frame.error("DENIED_OR_NOT_FOUND"));
                 return;
@@ -317,6 +344,18 @@ public class ClientHandler implements Runnable {
                     ack.transferId = upFileId;
                     sendFrame(ack);
 
+                    try {
+                        Frame fileMsg = new Frame(MessageType.DM, username, upToUser, "[FILE] " + upOrigName);
+                        long msgId = messageDao.saveSentReturnId(fileMsg);
+
+                        String filePath = new File(UPLOAD_DIR, sanitizeFilename(upFileId)).getAbsolutePath();
+                        fileDao.saveFile(msgId, upOrigName, filePath, upMime, upWritten);
+
+                        System.out.println("[DB] File metadata saved: msgId=" + msgId + ", path=" + filePath);
+                    } catch (SQLException sqle) {
+                        System.err.println("[DB] Failed to save file metadata: " + sqle.getMessage());
+                    }
+
                     if (upToUser != null && !upToUser.isBlank()) {
                         ClientHandler target = online.get(upToUser);
                         if (target != null) {
@@ -353,19 +392,44 @@ public class ClientHandler implements Runnable {
     }
     
     public void handleDownloadFiles(Frame f) {
-    	String fileId = f.body;
-        File file = new File(UPLOAD_DIR, sanitizeFilename(fileId));
-        System.out.println("[SERVER] DOWNLOAD_FILE: fileId=" + fileId + ", path=" + file.getAbsolutePath());
-        if (!file.exists()) {
-            System.err.println("[SERVER] File not found: " + file.getAbsolutePath());
-            sendFrame(Frame.error("FILE_NOT_FOUND"));
+        String fileIdStr = f.body;
+        long fileId = parseLongSafe(fileIdStr, 0L);
+        if (fileId <= 0) {
+            sendFrame(Frame.error("INVALID_FILE_ID"));
             return;
         }
+
         try {
-            String mime = pickJson(f.body, "mime") != null ? pickJson(f.body, "mime") : "application/octet-stream";
-            String name = fileNameMap.getOrDefault(fileId, fileId);
-            Frame meta = Frame.fileMeta(username, "", name, mime, fileId, file.length());
+            // ✅ Step 1: Load metadata from DB
+            var fileRow = fileDao.getFileByMessageId(fileId);
+            if (fileRow == null) {
+                sendFrame(Frame.error("FILE_NOT_FOUND_DB"));
+                System.err.println("[DB] No file record for id=" + fileId);
+                return;
+            }
+
+            File file = new File(fileRow.filePath);
+            if (!file.exists()) {
+                sendFrame(Frame.error("FILE_NOT_FOUND_DISK"));
+                System.err.println("[SERVER] File missing on disk: " + file.getAbsolutePath());
+                return;
+            }
+
+            // ✅ Step 2: Send file metadata frame first
+            String mime = (fileRow.mimeType != null) ? fileRow.mimeType : "application/octet-stream";
+            String name = (fileRow.fileName != null) ? fileRow.fileName : ("file-" + fileId);
+
+            Frame meta = Frame.fileMeta(
+                    username,
+                    "",             // recipient not needed for download
+                    name,
+                    mime,
+                    String.valueOf(fileId),
+                    file.length()
+            );
             sendFrame(meta);
+
+            // ✅ Step 3: Send file chunks
             try (InputStream fis = new BufferedInputStream(new FileInputStream(file))) {
                 byte[] buf = new byte[Frame.CHUNK_SIZE];
                 int n, seq = 0;
@@ -374,37 +438,256 @@ public class ClientHandler implements Runnable {
                     rem -= n;
                     boolean last = (rem == 0);
                     byte[] slice = (n == buf.length) ? buf : Arrays.copyOf(buf, n);
-                    Frame ch = Frame.fileChunk(username, "", fileId, seq++, last, slice);
+                    Frame ch = Frame.fileChunk(username, "", String.valueOf(fileId), seq++, last, slice);
                     sendFrame(ch);
                 }
             }
+
+            System.out.println("[SERVER] File sent successfully: " + fileRow.fileName);
+
+        } catch (SQLException e) {
+            System.err.println("[DB] Error fetching file info: " + e.getMessage());
+            sendFrame(Frame.error("DB_ERROR_FILE_FETCH"));
         } catch (IOException e) {
             System.err.println("[SERVER] Download failed: " + e.getMessage());
             sendFrame(Frame.error("DOWNLOAD_FAIL"));
         }
     }
 
+    private void handleFileHistory(Frame f) {
+        int limit = 5;   
+        int offset = 0;
+        try {
+
+            if (f.body != null && !f.body.isBlank()) {
+                String body = f.body.trim();
+                String limitStr = jsonGet(body, "limit");
+                String offsetStr = jsonGet(body, "offset");
+                if (limitStr != null) limit = Integer.parseInt(limitStr);
+                if (offsetStr != null) offset = Integer.parseInt(offsetStr);
+                if (limitStr == null && offsetStr == null) {
+                    // fallback to plain number
+                    limit = Integer.parseInt(body);
+                }
+            }
+        } catch (Exception ignore) {}
+
+        try {
+            var rows = fileDao.listFilesByUserPaged(username, limit, offset);
+            for (var r : rows) {
+                String info = String.format(
+                    "[FILE HIST] %s (%d bytes, %s)",
+                    r.fileName, r.fileSize,
+                    (r.uploadedAt != null ? r.uploadedAt.toString() : "unknown")
+                );
+                Frame hist = new Frame(MessageType.FILE_HISTORY, username, username, info);
+                hist.transferId = String.valueOf(r.id);
+                sendFrame(hist);
+            }
+            sendFrame(Frame.ack("OK FILE_HISTORY " + rows.size()));
+        } catch (SQLException e) {
+            sendFrame(Frame.error("FILE_HISTORY_FAIL"));
+            e.printStackTrace();
+        }
+    }
+    
+    private void handleDeleteFile(Frame f) {
+        long msgId = parseLongSafe(f.body, 0L);
+        if (msgId <= 0) {
+            sendFrame(Frame.error("INVALID_FILE_ID"));
+            return;
+        }
+
+        try {
+            boolean deleted = fileDao.deleteFileByMessageId(msgId);
+            if (deleted) {
+                sendFrame(Frame.ack("OK FILE_DELETED"));
+
+                // Optionally broadcast to peer so their UI removes file bubble
+                Frame evt = new Frame(MessageType.DELETE_FILE, username, "", "");
+                evt.transferId = String.valueOf(msgId);
+                broadcast(evt.toString(), true);
+
+                System.out.println("[SERVER] File deleted for messageId=" + msgId);
+            } else {
+                sendFrame(Frame.error("FILE_NOT_FOUND"));
+            }
+        } catch (SQLException e) {
+            System.err.println("[DB] File delete error: " + e.getMessage());
+            sendFrame(Frame.error("DB_FILE_DELETE_FAIL"));
+        }
+    }
+
     /* ================= AUDIO ================= */
     private record AudioResult(String id, String to, String savedName, long bytes, int durationSec) {}
-
+    /*change*/
     private void handleAudio(Frame f) {
         try {
             if (f.type == MessageType.AUDIO_META) {
+                // 1️⃣ Receive and store the audio file in uploads/
                 AudioResult a = receiveAudio(f);
+
+                // 2️⃣ Save message and file metadata to database
+                try {
+                    // Save message record first (just like file message)
+                    Frame audioMsg = new Frame(MessageType.DM, username, a.to, "[AUDIO]");
+                    long msgId = messageDao.saveSentReturnId(audioMsg);
+
+                    // Build absolute file path for the stored audio
+                    String audioPath = new File(UPLOAD_DIR, sanitizeFilename(a.id)).getAbsolutePath();
+
+                    // Save to DB using FileDao
+                    fileDao.saveAudio(
+                            msgId,
+                            a.savedName,
+                            audioPath,
+                            "audio/wav",           // or dynamic MIME if you detect from client
+                            a.bytes,
+                            a.durationSec
+                    );
+
+                    System.out.println("[DB] Audio metadata saved: msgId=" + msgId + ", duration=" + a.durationSec + "s");
+
+                } catch (SQLException sqle) {
+                    System.err.println("[DB] Failed to save audio metadata: " + sqle.getMessage());
+                }
+
+                // 3️⃣ Send confirmation ACK to the sender
                 Frame ack = Frame.ack("AUDIO_SAVED " + a.bytes + "B " + a.durationSec + "s");
                 ack.transferId = a.id;
                 sendFrame(ack);
+
+                // 4️⃣ Notify the recipient so their UI shows new audio bubble
                 notifyIncomingAudio(a);
+
                 System.out.println("[SERVER] AUDIO OK id=" + a.id + " -> " + a.savedName + " (" + a.bytes + "B)");
+
             } else {
                 System.out.println("[SERVER] Unexpected AUDIO_CHUNK without META");
             }
+
         } catch (IOException e) {
             sendFrame(Frame.error("AUDIO_FAIL"));
             System.err.println("[SERVER] AUDIO FAIL: " + e.getMessage());
         }
     }
+    /* ================= AUDIO HISTORY ================= */
+    private void handleAudioHistory(Frame f) {
+        int limit = 5;
+        int offset = 0;
+        try {
+            if (f.body != null && !f.body.isBlank()) {
+                String body = f.body.trim();
+                String limitStr = jsonGet(body, "limit");
+                String offsetStr = jsonGet(body, "offset");
+                if (limitStr != null) limit = Integer.parseInt(limitStr);
+                if (offsetStr != null) offset = Integer.parseInt(offsetStr);
+                if (limitStr == null && offsetStr == null)
+                    limit = Integer.parseInt(body);
+            }
+        } catch (Exception ignore) {}
 
+        try {
+            var rows = fileDao.listAudiosByUserPaged(username, limit, offset);
+            for (var r : rows) {
+                String info = String.format(
+                    "[AUDIO HIST] %s (%d bytes, %ss)",
+                    r.fileName,
+                    r.fileSize,
+                    (r.durationSec != null ? r.durationSec : "n/a")
+                );
+                Frame hist = new Frame(MessageType.AUDIO_HISTORY, username, username, info);
+                hist.transferId = String.valueOf(r.id);
+                sendFrame(hist);
+            }
+            sendFrame(Frame.ack("OK AUDIO_HISTORY " + rows.size()));
+        } catch (SQLException e) {
+            sendFrame(Frame.error("AUDIO_HISTORY_FAIL"));
+            e.printStackTrace();
+        }
+    }
+
+    /* ================= DOWNLOAD AUDIO ================= */
+    private void handleDownloadAudio(Frame f) {
+        long msgId = parseLongSafe(f.body, 0L);
+        if (msgId <= 0) {
+            sendFrame(Frame.error("INVALID_AUDIO_ID"));
+            return;
+        }
+
+        try {
+            var audioRow = fileDao.getAudioByMessageId(msgId);
+            if (audioRow == null) {
+                sendFrame(Frame.error("AUDIO_NOT_FOUND_DB"));
+                System.err.println("[DB] No audio record for id=" + msgId);
+                return;
+            }
+
+            File file = new File(audioRow.filePath);
+            if (!file.exists()) {
+                sendFrame(Frame.error("AUDIO_NOT_FOUND_DISK"));
+                System.err.println("[SERVER] Audio missing on disk: " + file.getAbsolutePath());
+                return;
+            }
+
+            String mime = (audioRow.mimeType != null) ? audioRow.mimeType : "audio/wav";
+            String name = (audioRow.fileName != null) ? audioRow.fileName : ("audio-" + msgId);
+
+            // send meta frame
+            Frame meta = Frame.fileMeta(username, "", name, mime, String.valueOf(msgId), file.length());
+            sendFrame(meta);
+
+            // send audio chunks
+            try (InputStream fis = new BufferedInputStream(new FileInputStream(file))) {
+                byte[] buf = new byte[Frame.CHUNK_SIZE];
+                int n, seq = 0;
+                long rem = file.length();
+                while ((n = fis.read(buf)) != -1) {
+                    rem -= n;
+                    boolean last = (rem == 0);
+                    byte[] slice = (n == buf.length) ? buf : Arrays.copyOf(buf, n);
+                    Frame ch = Frame.fileChunk(username, "", String.valueOf(msgId), seq++, last, slice);
+                    sendFrame(ch);
+                }
+            }
+
+            System.out.println("[SERVER] Audio sent successfully: " + audioRow.fileName);
+
+        } catch (SQLException e) {
+            System.err.println("[DB] Error fetching audio info: " + e.getMessage());
+            sendFrame(Frame.error("DB_ERROR_AUDIO_FETCH"));
+        } catch (IOException e) {
+            System.err.println("[SERVER] Audio download failed: " + e.getMessage());
+            sendFrame(Frame.error("DOWNLOAD_AUDIO_FAIL"));
+        }
+    }
+
+    /* ================= DELETE AUDIO ================= */
+    private void handleDeleteAudio(Frame f) {
+        long msgId = parseLongSafe(f.body, 0L);
+        if (msgId <= 0) {
+            sendFrame(Frame.error("INVALID_AUDIO_ID"));
+            return;
+        }
+
+        try {
+            boolean deleted = fileDao.deleteAudioByMessageId(msgId);
+            if (deleted) {
+                sendFrame(Frame.ack("OK AUDIO_DELETED"));
+                Frame evt = new Frame(MessageType.DELETE_AUDIO, username, "", "");
+                evt.transferId = String.valueOf(msgId);
+                broadcast(evt.toString(), true);
+                System.out.println("[SERVER] Audio deleted for messageId=" + msgId);
+            } else {
+                sendFrame(Frame.error("AUDIO_NOT_FOUND"));
+            }
+        } catch (SQLException e) {
+            System.err.println("[DB] Audio delete error: " + e.getMessage());
+            sendFrame(Frame.error("DB_AUDIO_DELETE_FAIL"));
+        }
+    }
+
+    
     private AudioResult receiveAudio(Frame meta) throws IOException {
         if (!UPLOAD_DIR.exists()) UPLOAD_DIR.mkdirs();
 
