@@ -1,7 +1,8 @@
-// common/MessageType.java
+
 package common;
+
 public enum MessageType {
-    LOGIN       ((byte) 0),   
+	LOGIN       ((byte) 0),   
     REGISTER    ((byte) 1),  
     DM          ((byte) 2),   
     ACK         ((byte) 3), 
@@ -27,7 +28,12 @@ public enum MessageType {
     DELETE_MSG((byte)31),
     EDIT_MSG((byte)32),
     SEARCH((byte)33),
-    SEARCH_HIT((byte)34); 
+    SEARCH_HIT((byte)34),
+    FILE_HISTORY((byte)35),     // ✅ Added for file history scrolling
+    DELETE_FILE((byte)36),
+    DELETE_AUDIO((byte)37),
+    AUDIO_HISTORY((byte)38),
+	DOWNLOAD_AUDIO((byte)39);
     public final byte id;
     MessageType(byte id){ this.id = id; }
 
