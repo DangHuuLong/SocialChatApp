@@ -21,6 +21,18 @@ public class UIMessageHandler {
         this.controller = controller;
     }
 
+    /* chỉ giữ size nếu meta có cả MIME • SIZE */
+    private static String normalizeSizeOnly(String meta) {
+        if (meta == null) return "";
+        String m = meta;
+        int bullet = m.lastIndexOf('•');
+        if (bullet >= 0) m = m.substring(bullet + 1);
+        m = m.trim();
+        if (m.matches("(?i)\\d+(?:\\.\\d+)?\\s*(B|KB|MB|GB|TB)")) return m;
+        if (m.matches("(?i)\\d+(?:\\.\\d+)?(B|KB|MB|GB|TB)")) return m;
+        return "";
+    }
+
     private void attachSideMenu(HBox row, Region spacer, boolean incoming, String messageId) {
         HBox spacerBox = new HBox();
         HBox.setHgrow(spacerBox, Priority.ALWAYS);
@@ -61,26 +73,17 @@ public class UIMessageHandler {
         boolean editable = "outgoing-text".equals(bubbleId);
         miEdit.setDisable(!editable);
 
-        Label textLabel = null;
-        if (editable && bubble instanceof VBox vb) {
-            for (Node n : vb.getChildren()) {
-                if (n instanceof Label) { textLabel = (Label) n; break; }
-            }
-        }
-
         final Label labelRef = findTextLabelInRow(row, incoming);
         final boolean canEdit = (labelRef != null) && "outgoing-text".equals(
                 (row.getChildren().isEmpty() ? null
-                 : ((Region)(incoming ? row.getChildren().get(0) : row.getChildren().get(row.getChildren().size()-1)))).getId())
-        ;
+                 : ((Region)(incoming ? row.getChildren().get(0) : row.getChildren().get(row.getChildren().size()-1)))).getId());
         miEdit.setDisable(!canEdit);
         miEdit.setOnAction(e -> {
             if (!canEdit) return;
-
             final Object msgId = (messageId != null) ? messageId : row.getUserData();
             if (msgId == null) return;
-
             final String current = labelRef.getText();
+
             TextInputDialog dialog = new TextInputDialog(current);
             dialog.setTitle("Chỉnh sửa tin nhắn");
             dialog.setHeaderText(null);
@@ -92,7 +95,6 @@ public class UIMessageHandler {
                 if (trimmed.isEmpty() || trimmed.equals(current)) return;
 
                 labelRef.setText(trimmed);
-
                 try {
                     long id = Long.parseLong(String.valueOf(msgId));
                     if (controller.getConnection() != null && controller.getConnection().isAlive()) {
@@ -108,7 +110,7 @@ public class UIMessageHandler {
                 }
             });
         });
-        
+
         miDelete.setOnAction(e -> {
             controller.getMessageContainer().getChildren().remove(row);
             Object ud = (messageId != null) ? messageId : row.getUserData();
@@ -181,6 +183,7 @@ public class UIMessageHandler {
         return addRowWithBubble(bubble, incoming, messageId);
     }
 
+    /* IMAGE: chỉ ImageView, không label */
     public HBox addImageMessage(Image img, String caption, boolean incoming, String messageId) {
         VBox box = new VBox(4);
         box.setId(incoming ? "incoming-image" : "outgoing-image");
@@ -189,12 +192,11 @@ public class UIMessageHandler {
         iv.setFitWidth(260);
         iv.setPreserveRatio(true);
 
-        Label cap = new Label(caption);
-        box.getChildren().addAll(iv, cap);
-
+        box.getChildren().add(iv);
         return addRowWithBubble(box, incoming, messageId);
     }
 
+    /* FILE: chỉ tên + kích thước (lọc MIME) */
     public HBox addFileMessage(String filename, String meta, boolean incoming, String messageId) {
         VBox box = new VBox();
         box.setId(incoming ? "incoming-file" : "outgoing-file");
@@ -206,13 +208,27 @@ public class UIMessageHandler {
         Label icon = new Label("📄");
         icon.setStyle("-fx-font-size:20px;");
 
-        Label nameLbl = new Label(filename);
+        Label nameLbl = new Label(filename == null ? "" : filename);
+        nameLbl.setId("fileNamePrimary");
         nameLbl.getStyleClass().add("file-name");
 
-        Label metaLbl = new Label(meta);
+        // --- LẤY CHỈ SIZE ---
+        String sizeOnly = normalizeSizeOnly(meta);
+
+        // Nếu meta trống, thử lấy size từ dlPath theo fileId (messageId)
+        if ((sizeOnly == null || sizeOnly.isBlank()) && messageId != null) {
+            var f = controller.getDlPath().get(messageId);
+            if (f != null && f.exists()) {
+                sizeOnly = UtilHandler.humanBytes(f.length());
+            }
+        }
+
+        Label metaLbl = new Label(sizeOnly == null ? "" : sizeOnly);
+        metaLbl.setId("fileMeta");
         metaLbl.getStyleClass().add("meta");
 
         VBox info = new VBox(2);
+        info.setId("fileInfoBox");
         info.getChildren().addAll(nameLbl, metaLbl);
 
         Region innerSpacer = new Region();
@@ -221,8 +237,17 @@ public class UIMessageHandler {
         content.getChildren().addAll(icon, info, innerSpacer);
         box.getChildren().add(content);
 
-        return addRowWithBubble(box, incoming, messageId);
+        // Tạo row & gán userData = messageId để về sau cập nhật size
+        HBox row = addRowWithBubble(box, incoming, messageId);
+
+        // Nếu vẫn chưa có size (file chưa có trên đĩa), cập nhật hậu kỳ khi có dữ liệu
+        if ((sizeOnly == null || sizeOnly.isBlank()) && messageId != null && controller.getMediaHandler() != null) {
+            Platform.runLater(() -> controller.getMediaHandler().updateGenericFileMetaByFid(messageId));
+        }
+
+        return row;
     }
+
 
     public HBox addTextMessage(String text, boolean incoming) { return addTextMessage(text, incoming, (String) null); }
     public HBox addImageMessage(Image img, String caption, boolean incoming) { return addImageMessage(img, caption, incoming, (String) null); }
@@ -242,11 +267,15 @@ public class UIMessageHandler {
 
         Button playBtn = new Button("▶");
         playBtn.getStyleClass().add("audio-btn");
+        playBtn.setId("voicePlay");
 
         Slider slider = new Slider();
         slider.setPrefWidth(200);
+        slider.setId("voiceSlider");
 
         Label dur = new Label(duration);
+        dur.setId("voiceDuration");
+
         voiceBox.getChildren().addAll(playBtn, slider, dur);
 
         Region spacer = new Region();
@@ -261,10 +290,10 @@ public class UIMessageHandler {
         if (!incoming && fileId != null) {
             controller.getOutgoingFileBubbles().put(fileId, row);
         }
-        scrollToBottom();
         return row;
     }
 
+    /* VIDEO: chỉ khu vực phát + nút Play + Slider, KHÔNG label */
     public HBox addVideoMessage(String filename, String meta, boolean incoming, String fileId) {
         if (controller.getMessageContainer().getChildren().size() > 100) {
             controller.getMessageContainer().getChildren().remove(0);
@@ -280,17 +309,19 @@ public class UIMessageHandler {
         Region videoArea = new Region();
         videoArea.setPrefSize(320, 180);
         videoArea.setStyle("-fx-background-color: #111111; -fx-background-radius: 8;");
+        videoArea.setId("videoArea");
 
         VBox controls = new VBox(4);
+        controls.setId("videoControls");
+
         Button playBtn = new Button("▶");
+        playBtn.setId("videoPlay");
+
         Slider slider = new Slider();
         slider.setPrefWidth(220);
-        Label nameLbl = new Label(filename);
-        nameLbl.getStyleClass().add("file-name");
-        Label metaLbl = new Label(meta);
-        metaLbl.getStyleClass().add("meta");
-        controls.getChildren().addAll(playBtn, slider, nameLbl, metaLbl);
+        slider.setId("videoSlider");
 
+        controls.getChildren().addAll(playBtn, slider);
         box.getChildren().addAll(videoArea, controls);
 
         Region spacer = new Region();
@@ -305,7 +336,6 @@ public class UIMessageHandler {
         if (!incoming && fileId != null) {
             controller.getOutgoingFileBubbles().put(fileId, row);
         }
-        scrollToBottom();
         return row;
     }
 
@@ -320,7 +350,7 @@ public class UIMessageHandler {
             lbl.getStyleClass().add("chat-status-offline");
         }
     }
-    
+
     private Label findTextLabelInRow(HBox row, boolean incoming) {
         Node bubble = null;
         if (incoming) {

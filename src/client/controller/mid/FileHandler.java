@@ -17,42 +17,69 @@ public class FileHandler {
     }
 
     public void showOutgoingFile(String filename, String mime, long bytes, String fileId, String duration) {
-        MediaKind kind = UtilHandler.classifyMedia(mime, filename);
-        String meta = (mime == null ? "" : mime) + " • " + UtilHandler.humanBytes(bytes);
+        final String safeId   = (fileId == null) ? "" : fileId;
+        final String safeName = (filename == null) ? "" : filename;
+        final String safeMime = (mime == null || mime.isBlank()) ? "application/octet-stream" : mime;
+
+        if (!safeId.isBlank()) {
+            controller.getFileIdToName().put(safeId, safeName);
+            controller.getFileIdToMime().put(safeId, safeMime);
+        }
+
+        MediaKind kind = UtilHandler.classifyMedia(safeMime, safeName);
+        // CHỈ size (không MIME)
+        String sizeOnly = (bytes > 0) ? UtilHandler.humanBytes(bytes) : "";
+        String metaText = sizeOnly;
 
         HBox row;
+
         switch (kind) {
             case IMAGE -> {
                 Image img;
                 try {
-                    File f = new File("Uploads", fileId);
-                    if (f.exists()) {
-                        img = new Image(f.toURI().toString(), 200, 0, true, true);
+                    if (!safeId.isBlank()) {
+                        File f = new File("Uploads", safeId);
+                        if (f.exists()) {
+                            img = new Image(f.toURI().toString(), 200, 0, true, true);
+                        } else {
+                            img = new WritableImage(8, 8);
+                        }
                     } else {
                         img = new WritableImage(8, 8);
                     }
                 } catch (Exception e) {
                     img = new WritableImage(8, 8);
                 }
-                row = controller.addImageMessage(img, filename + " • " + UtilHandler.humanBytes(bytes), false);
-                row.setUserData(fileId);
+
+                // Caption: "<name> • <size>" (nếu có size)
+                String caption = safeName;
+                if (!sizeOnly.isBlank()) caption = safeName + " • " + sizeOnly;
+
+                row = controller.addImageMessage(img, caption, false, safeId.isBlank() ? null : safeId);
+                if (!safeId.isBlank()) row.setUserData(safeId);
             }
+
             case AUDIO -> {
-                row = controller.addVoiceMessage(duration != null ? duration : "--:--", false, fileId);
-                row.setUserData(fileId);
+                String dur = (duration != null && !duration.isBlank()) ? duration : "--:--";
+                row = controller.addVoiceMessage(dur, false, safeId.isBlank() ? null : safeId);
+                if (!safeId.isBlank()) row.setUserData(safeId);
             }
+
             case VIDEO -> {
-                row = controller.addVideoMessage(filename, meta, false, fileId);
-                row.setUserData(fileId);
+                // Video: tên + size (không MIME)
+                row = controller.addVideoMessage(safeName, metaText, false, safeId.isBlank() ? null : safeId);
+                if (!safeId.isBlank()) row.setUserData(safeId);
             }
+
             default -> {
-                row = controller.addFileMessage(filename, meta, false);
-                row.setUserData(fileId);
+                // File thường: tên + size (không MIME)
+                row = controller.addFileMessage(safeName, metaText, false, safeId.isBlank() ? null : safeId);
+                if (!safeId.isBlank()) row.setUserData(safeId);
             }
         }
 
-        if (fileId != null) {
-            controller.getOutgoingFileBubbles().put(fileId, row);
+        if (!safeId.isBlank()) {
+            controller.getOutgoingFileBubbles().put(safeId, row);
         }
     }
 }

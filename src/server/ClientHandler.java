@@ -12,7 +12,6 @@ import java.net.Socket;
 import java.net.SocketException;
 import java.sql.SQLException;
 import java.util.Arrays;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -31,7 +30,7 @@ public class ClientHandler implements Runnable {
     private static final File UPLOAD_DIR = new File("uploads");
     private static final Map<String, String> fileNameMap = new ConcurrentHashMap<>();
 
-    // ==== State tạm cho 1 phiên upload file ====
+    // ==== state 1 phiên upload (hợp nhất file/audio) ====
     private String upFileId;
     private String upToUser;
     private String upOrigName;
@@ -40,6 +39,10 @@ public class ClientHandler implements Runnable {
     private int upExpectedSeq;
     private long upWritten;
     private BufferedOutputStream upOut;
+
+    // map uuid<->id để tải lại theo uuid phía client cũ
+    private static final Map<String, Long> uuidToFileId = new ConcurrentHashMap<>();
+    private static final Map<String, Long> uuidToMsgId  = new ConcurrentHashMap<>();
 
     public ClientHandler(Socket socket,
                          Set<ClientHandler> clients,
@@ -63,37 +66,35 @@ public class ClientHandler implements Runnable {
 
             while (true) {
                 Frame f = FrameIO.read(binIn);
-                if (f == null) {
-                    System.out.println("[SERVER] FrameIO.read returned null, client likely disconnected");
-                    break;
-                }
-                System.out.println("[SERVER] Received frame: type=" + f.type + ", transferId=" + f.transferId);
+                if (f == null) break;
+
                 switch (f.type) {
                     case REGISTER, LOGIN -> handleLogin(f);
                     case DM -> handleDirectMessage(f);
                     case HISTORY -> handleHistory(f);
+
+                    // HỢP NHẤT: FILE + AUDIO đều đi qua 2 type meta/chunk này
                     case FILE_META, FILE_CHUNK -> handleFile(f);
-                    case AUDIO_META, AUDIO_CHUNK -> handleAudio(f);
+                    case AUDIO_META, AUDIO_CHUNK -> handleFile(f); // tương thích ngược
+
                     case CALL_INVITE, CALL_ACCEPT, CALL_REJECT,
                          CALL_CANCEL, CALL_BUSY, CALL_END,
                          CALL_OFFER, CALL_ANSWER, CALL_ICE -> handleCall(f);
+
                     case DELETE_MSG -> handleDeleteMessage(f);
-                    case DOWNLOAD_FILE -> handleDownloadFiles(f);
+
+                    // Lịch sử/tải/xoá file — CHUNG
+                    case DOWNLOAD_FILE -> handleDownloadFile(f);
+                    case FILE_HISTORY  -> handleFileHistory(f);
+                    case DELETE_FILE   -> handleDeleteFile(f);
+
                     case EDIT_MSG -> handleEditMessage(f);
-                    case SEARCH -> handleSearch(f);
-                    case FILE_HISTORY -> handleFileHistory(f);
-                    case DELETE_FILE -> handleDeleteFile(f);
-                    case AUDIO_HISTORY -> handleAudioHistory(f);
-                    case DOWNLOAD_AUDIO -> handleDownloadAudio(f);
-                    case DELETE_AUDIO -> handleDeleteAudio(f);
+                    case SEARCH   -> handleSearch(f);
 
                     default -> System.out.println("[SERVER] Unknown frame: " + f.type);
                 }
             }
-        } catch (SocketException se) {
-            System.out.println("⬅ Client disconnected: " + socketSafe() + " (" + se.getMessage() + ")");
-        } catch (EOFException eof) {
-            System.out.println("⬅ Client disconnected: " + socketSafe() + " (EOF)");
+        } catch (SocketException | EOFException ignored) {
         } catch (IOException e) {
             System.err.println("[SERVER] IO error: " + e.getMessage());
         } finally {
@@ -117,14 +118,10 @@ public class ClientHandler implements Runnable {
 
         try {
             var pending = messageDao.loadQueued(username);
-            for (var m : pending) {
-                sendFrame(m); // m.transferId đã là id DB
-            }
-            if (!pending.isEmpty())
-                sendFrame(Frame.ack("Delivered " + pending.size() + " offline messages"));
+            for (var m : pending) sendFrame(m);
+            if (!pending.isEmpty()) sendFrame(Frame.ack("Delivered " + pending.size() + " offline messages"));
         } catch (SQLException e) {
             sendFrame(Frame.error("OFFLINE_DELIVERY_FAIL"));
-            e.printStackTrace();
         }
     }
 
@@ -135,16 +132,15 @@ public class ClientHandler implements Runnable {
             sendFrame(Frame.error("BAD_DM"));
             return;
         }
-
         try {
             long id;
             ClientHandler target = online.get(to);
             if (target != null) {
                 id = messageDao.saveSentReturnId(f);
                 f.transferId = String.valueOf(id);
-                target.sendFrame(f); // gửi cho người nhận kèm id
+                target.sendFrame(f);
                 Frame ack = Frame.ack("OK DM");
-                ack.transferId = String.valueOf(id); // trả id cho người gửi để map UI
+                ack.transferId = String.valueOf(id);
                 sendFrame(ack);
             } else {
                 id = messageDao.saveQueuedReturnId(f);
@@ -154,56 +150,9 @@ public class ClientHandler implements Runnable {
             }
         } catch (SQLException e) {
             sendFrame(Frame.error("DM_SAVE_FAIL"));
-            e.printStackTrace();
         }
     }
 
-    /* ================= DELETE ================= */
-    private void handleDeleteMessage(Frame f) {
-        try {
-            long id = parseLongSafe(f.body, 0L);
-            if (id <= 0) {
-                sendFrame(Frame.error("BAD_ID"));
-                return;
-            }
-            String peer = messageDao.deleteByIdReturningPeer(id, username);
-            try {
-                var fileRow = fileDao.getFileByMessageId(id);
-                if (fileRow != null) {
-                    // Delete from DB
-                    fileDao.deleteFileByMessageId(id);
-                    // Delete actual file
-                    File toDelete = new File(fileRow.filePath);
-                    if (toDelete.exists() && toDelete.delete()) {
-                        System.out.println("[FILE] Deleted " + toDelete.getName());
-                    } else {
-                        System.out.println("[FILE] No file to delete for messageId=" + id);
-                    }
-                }
-            } catch (SQLException ex) {
-                System.err.println("[DB] Could not delete file metadata for msgId=" + id + ": " + ex.getMessage());
-            }
-
-            if (peer == null) {
-                sendFrame(Frame.error("DENIED_OR_NOT_FOUND"));
-                return;
-            }
-
-            Frame ack = Frame.ack("OK DELETE");
-            ack.transferId = String.valueOf(id);
-            sendFrame(ack);
-
-            Frame evt = new Frame(MessageType.DELETE_MSG, username, peer, "");
-            evt.transferId = String.valueOf(id);
-            ClientHandler peerHandler = online.get(peer);
-            if (peerHandler != null) {
-                peerHandler.sendFrame(evt);
-            }
-        } catch (Exception e) {
-            sendFrame(Frame.error("DELETE_FAIL"));
-        }
-    }
-    
     /* ================= EDIT ================= */
     private void handleEditMessage(Frame f) {
         try {
@@ -212,17 +161,10 @@ public class ClientHandler implements Runnable {
             String newBody = (f.body == null) ? "" : f.body;
 
             String peer = messageDao.updateByIdReturningPeer(id, username, newBody);
-            if (peer == null) {
-                sendFrame(Frame.error("DENIED_OR_NOT_FOUND"));
-                return;
-            }
+            if (peer == null) { sendFrame(Frame.error("DENIED_OR_NOT_FOUND")); return; }
 
-            // ACK cho người gửi
-            Frame ack = Frame.ack("OK EDIT");
-            ack.transferId = String.valueOf(id);
-            sendFrame(ack);
+            Frame ack = Frame.ack("OK EDIT"); ack.transferId = String.valueOf(id); sendFrame(ack);
 
-            // Thông báo cho người nhận cập nhật UI
             Frame evt = new Frame(MessageType.EDIT_MSG, username, peer, newBody);
             evt.transferId = String.valueOf(id);
             ClientHandler peerHandler = online.get(peer);
@@ -232,8 +174,7 @@ public class ClientHandler implements Runnable {
         }
     }
 
-
-    /* ================= SEARCH MESSAGE ================= */
+    /* ================= SEARCH ================= */
     private void handleSearch(Frame f){
         String peer = f.recipient;
         String q = jsonGet(f.body, "q");
@@ -243,7 +184,7 @@ public class ClientHandler implements Runnable {
         try{
             var rows = messageDao.searchConversation(username, peer, q, limit, offset);
             for (var r : rows){
-                Frame hit = new Frame(common.MessageType.SEARCH_HIT, r.sender, r.recipient, r.body);
+                Frame hit = new Frame(MessageType.SEARCH_HIT, r.sender, r.recipient, r.body);
                 hit.transferId = String.valueOf(r.id);
                 sendFrame(hit);
             }
@@ -273,21 +214,20 @@ public class ClientHandler implements Runnable {
             sendFrame(Frame.ack("OK HISTORY " + rows.size()));
         } catch (SQLException e) {
             sendFrame(Frame.error("HISTORY_FAIL"));
-            e.printStackTrace();
         }
     }
 
-    /* ================= FILE ================= */
+    /* ================= FILE (hợp nhất cả AUDIO) ================= */
     private void handleFile(Frame f) {
         try {
-            if (f.type == MessageType.FILE_META) {
+            // --- META (FILE_META / AUDIO_META) ---
+            if (f.type == MessageType.FILE_META || f.type == MessageType.AUDIO_META) {
                 String body = (f.body == null ? "" : f.body);
-                String from = pickJson(body, "from");
-                String to = pickJson(body, "to");
+                String to   = pickJson(body, "to");
                 String name = pickJson(body, "name");
                 String mime = pickJson(body, "mime");
-                String fid = pickJson(body, "fileId");
-                long size = parseLongSafe(pickJson(body, "size"), 0);
+                String fid  = pickJson(body, "fileId");
+                long size   = parseLongSafe(pickJson(body, "size"), 0);
 
                 if (fid == null || fid.isBlank()) fid = java.util.UUID.randomUUID().toString();
                 if (name == null || name.isBlank()) name = "file-" + fid;
@@ -295,67 +235,58 @@ public class ClientHandler implements Runnable {
                 if (size > Frame.MAX_FILE_BYTES) throw new IOException("file too large");
 
                 if (upOut != null) { try { upOut.close(); } catch (Exception ignore) {} }
-                upFileId = fid;
-                upToUser = to;
-                upOrigName = name;
-                upMime = mime;
+                upFileId       = fid;
+                upToUser       = to;
+                upOrigName     = name;
+                upMime         = mime;
                 upDeclaredSize = size;
-                upExpectedSeq = 0;
-                upWritten = 0L;
+                upExpectedSeq  = 0;
+                upWritten      = 0L;
 
                 if (!UPLOAD_DIR.exists()) UPLOAD_DIR.mkdirs();
                 File outFile = new File(UPLOAD_DIR, sanitizeFilename(fid));
                 fileNameMap.put(fid, name);
                 upOut = new BufferedOutputStream(new FileOutputStream(outFile));
-
-                System.out.println("[SERVER] FILE META " + body);
                 return;
             }
 
-            if (f.type == MessageType.FILE_CHUNK) {
-                if (upOut == null || upFileId == null) {
-                    throw new IOException("FILE_CHUNK without META");
-                }
-                if (!upFileId.equals(f.transferId)) {
-                    throw new IOException("Mismatched fileId");
-                }
-                if (f.seq != upExpectedSeq) {
-                    throw new IOException("Out-of-order chunk: got=" + f.seq + " need=" + upExpectedSeq);
-                }
+            // --- CHUNK (FILE_CHUNK / AUDIO_CHUNK) ---
+            if (f.type == MessageType.FILE_CHUNK || f.type == MessageType.AUDIO_CHUNK) {
+                if (upOut == null || upFileId == null) throw new IOException("CHUNK without META");
+                if (!upFileId.equals(f.transferId)) throw new IOException("Mismatched fileId");
+                if (f.seq != upExpectedSeq) throw new IOException("Out-of-order chunk");
 
                 int len = (f.bin == null ? 0 : f.bin.length);
-                if (upWritten + len > Frame.MAX_FILE_BYTES) {
-                    throw new IOException("File exceeds limit");
-                }
-                if (len > 0) {
-                    upOut.write(f.bin);
-                    upWritten += len;
-                }
+                if (upWritten + len > Frame.MAX_FILE_BYTES) throw new IOException("File exceeds limit");
+                if (len > 0) { upOut.write(f.bin); upWritten += len; }
                 upExpectedSeq++;
 
-                System.out.println("[SERVER] FILE CHUNK id=" + f.transferId + " seq=" + f.seq);
-
                 if (f.last) {
-                    upOut.flush();
-                    upOut.close();
-                    upOut = null;
+                    upOut.flush(); upOut.close(); upOut = null;
 
+                    // ack về client gửi
                     Frame ack = Frame.ack("FILE_SAVED " + upWritten + "B " + upMime);
                     ack.transferId = upFileId;
                     sendFrame(ack);
 
+                    long msgId = 0L;
+                    long fileId = 0L;
+
                     try {
+                        // tạo 1 message text đại diện file
                         Frame fileMsg = new Frame(MessageType.DM, username, upToUser, "[FILE] " + upOrigName);
-                        long msgId = messageDao.saveSentReturnId(fileMsg);
+                        msgId = messageDao.saveSentReturnId(fileMsg);
 
                         String filePath = new File(UPLOAD_DIR, sanitizeFilename(upFileId)).getAbsolutePath();
-                        fileDao.saveFile(msgId, upOrigName, filePath, upMime, upWritten);
+                        fileId = fileDao.save(msgId, upOrigName, filePath, upMime, upWritten);
 
-                        System.out.println("[DB] File metadata saved: msgId=" + msgId + ", path=" + filePath);
+                        if (fileId > 0) uuidToFileId.put(upFileId, fileId);
+                        if (msgId  > 0) uuidToMsgId.put(upFileId, msgId);
                     } catch (SQLException sqle) {
                         System.err.println("[DB] Failed to save file metadata: " + sqle.getMessage());
                     }
 
+                    // push sự kiện tới người nhận
                     if (upToUser != null && !upToUser.isBlank()) {
                         ClientHandler target = online.get(upToUser);
                         if (target != null) {
@@ -363,7 +294,10 @@ public class ClientHandler implements Runnable {
                             String json = "{"
                                     + "\"from\":\"" + escJson(username) + "\","
                                     + "\"to\":\""   + escJson(upToUser) + "\","
+                                    + "\"uuid\":\"" + escJson(upFileId) + "\","
                                     + "\"id\":\""   + escJson(upFileId) + "\","
+                                    + "\"fileId\":" + fileId + ","
+                                    + "\"messageId\":" + msgId + ","
                                     + "\"name\":\"" + escJson(savedName) + "\","
                                     + "\"mime\":\"" + escJson(upMime) + "\","
                                     + "\"bytes\":"  + upWritten
@@ -373,63 +307,73 @@ public class ClientHandler implements Runnable {
                         }
                     }
 
-                    System.out.println("[SERVER] FILE OK id=" + upFileId + " -> " + upOrigName + " (" + upWritten + "B)");
-                    upFileId = null;
-                    upToUser = null;
-                    upOrigName = null;
-                    upMime = null;
-                    upDeclaredSize = 0;
-                    upExpectedSeq = 0;
-                    upWritten = 0;
+                    // reset state
+                    upFileId = null; upToUser = null; upOrigName = null; upMime = null;
+                    upDeclaredSize = 0; upExpectedSeq = 0; upWritten = 0;
                 }
+                return;
             }
+
         } catch (IOException e) {
             try { if (upOut != null) upOut.close(); } catch (Exception ignore) {}
             upOut = null; upFileId = null;
-            System.err.println("[SERVER] FILE FAIL: " + e.getMessage());
             sendFrame(Frame.error("FILE_FAIL"));
         }
     }
-    
-    public void handleDownloadFiles(Frame f) {
-        String fileIdStr = f.body;
-        long fileId = parseLongSafe(fileIdStr, 0L);
-        if (fileId <= 0) {
-            sendFrame(Frame.error("INVALID_FILE_ID"));
-            return;
-        }
 
+    /* ================= DOWNLOAD (hợp nhất) ================= */
+    private void handleDownloadFile(Frame f) {
         try {
-            // ✅ Step 1: Load metadata from DB
-            var fileRow = fileDao.getFileByMessageId(fileId);
-            if (fileRow == null) {
-                sendFrame(Frame.error("FILE_NOT_FOUND_DB"));
-                System.err.println("[DB] No file record for id=" + fileId);
-                return;
+            String body = (f.body == null) ? "" : f.body.trim();
+
+            Long fileId = null;
+            Long messageId = null;
+
+            String fileIdStr = jsonGet(body, "fileId");
+            String msgIdStr  = jsonGet(body, "messageId");
+            String legacyId  = jsonGet(body, "id"); // uuid cũ
+
+            if (fileIdStr != null && !fileIdStr.isBlank()) { try { fileId = Long.parseLong(fileIdStr); } catch (Exception ignore) {} }
+            if (msgIdStr  != null && !msgIdStr.isBlank())  { try { messageId = Long.parseLong(msgIdStr); }  catch (Exception ignore) {} }
+
+            if (fileId == null && messageId == null) {
+                long n = parseLongSafe(body, 0L);
+                if (n > 0) fileId = n;
             }
+
+            String uuid = null;
+            if (legacyId != null && !legacyId.isBlank()) uuid = legacyId;
+            else if ((fileId == null && messageId == null) && body.length() >= 32 && body.contains("-")) uuid = body;
+            if (uuid != null) {
+                Long mappedFileId = uuidToFileId.get(uuid);
+                Long mappedMsgId  = uuidToMsgId.get(uuid);
+                if (fileId == null && mappedFileId != null) fileId = mappedFileId;
+                if (messageId == null && mappedMsgId  != null) messageId = mappedMsgId;
+            }
+
+            FileDao.FileRecord fileRow = null;
+            if (fileId != null && fileId > 0) fileRow = fileDao.getById(fileId);
+            if (fileRow == null && messageId != null && messageId > 0) fileRow = fileDao.getByMessageId(messageId);
+
+            if (fileRow == null) { sendFrame(Frame.error("INVALID_FILE_ID")); return; }
 
             File file = new File(fileRow.filePath);
-            if (!file.exists()) {
-                sendFrame(Frame.error("FILE_NOT_FOUND_DISK"));
-                System.err.println("[SERVER] File missing on disk: " + file.getAbsolutePath());
-                return;
-            }
+            if (!file.exists()) { sendFrame(Frame.error("FILE_NOT_FOUND_DISK")); return; }
 
-            // ✅ Step 2: Send file metadata frame first
             String mime = (fileRow.mimeType != null) ? fileRow.mimeType : "application/octet-stream";
-            String name = (fileRow.fileName != null) ? fileRow.fileName : ("file-" + fileId);
+            String name = (fileRow.fileName  != null) ? fileRow.fileName  : ("file-" + fileRow.id);
 
-            Frame meta = Frame.fileMeta(
-                    username,
-                    "",             // recipient not needed for download
-                    name,
-                    mime,
-                    String.valueOf(fileId),
-                    file.length()
-            );
-            sendFrame(meta);
+            String metaJson = "{"
+                    + "\"from\":\"" + escJson(username) + "\","
+                    + "\"to\":\"\","
+                    + "\"name\":\"" + escJson(name) + "\","
+                    + "\"mime\":\"" + escJson(mime) + "\","
+                    + "\"fileId\":\"" + fileRow.id + "\","
+                    + "\"messageId\":\"" + (fileRow.messageId) + "\","
+                    + "\"size\":" + file.length()
+                    + "}";
+            sendFrame(new Frame(MessageType.FILE_META, username, "", metaJson));
 
-            // ✅ Step 3: Send file chunks
             try (InputStream fis = new BufferedInputStream(new FileInputStream(file))) {
                 byte[] buf = new byte[Frame.CHUNK_SIZE];
                 int n, seq = 0;
@@ -438,42 +382,38 @@ public class ClientHandler implements Runnable {
                     rem -= n;
                     boolean last = (rem == 0);
                     byte[] slice = (n == buf.length) ? buf : Arrays.copyOf(buf, n);
-                    Frame ch = Frame.fileChunk(username, "", String.valueOf(fileId), seq++, last, slice);
+                    Frame ch = new Frame(MessageType.FILE_CHUNK, username, "", "");
+                    ch.transferId = String.valueOf(fileRow.id);
+                    ch.seq = seq++;
+                    ch.last = last;
+                    ch.bin = slice;
                     sendFrame(ch);
                 }
             }
-
-            System.out.println("[SERVER] File sent successfully: " + fileRow.fileName);
-
         } catch (SQLException e) {
-            System.err.println("[DB] Error fetching file info: " + e.getMessage());
             sendFrame(Frame.error("DB_ERROR_FILE_FETCH"));
         } catch (IOException e) {
-            System.err.println("[SERVER] Download failed: " + e.getMessage());
             sendFrame(Frame.error("DOWNLOAD_FAIL"));
         }
     }
 
+    /* ================= FILE HISTORY (hợp nhất) ================= */
     private void handleFileHistory(Frame f) {
-        int limit = 5;   
+        int limit = 5;
         int offset = 0;
         try {
-
             if (f.body != null && !f.body.isBlank()) {
                 String body = f.body.trim();
                 String limitStr = jsonGet(body, "limit");
                 String offsetStr = jsonGet(body, "offset");
-                if (limitStr != null) limit = Integer.parseInt(limitStr);
+                if (limitStr != null)  limit  = Integer.parseInt(limitStr);
                 if (offsetStr != null) offset = Integer.parseInt(offsetStr);
-                if (limitStr == null && offsetStr == null) {
-                    // fallback to plain number
-                    limit = Integer.parseInt(body);
-                }
+                if (limitStr == null && offsetStr == null) limit = Integer.parseInt(body);
             }
         } catch (Exception ignore) {}
 
         try {
-            var rows = fileDao.listFilesByUserPaged(username, limit, offset);
+            var rows = fileDao.listByUserPaged(username, limit, offset);
             for (var r : rows) {
                 String info = String.format(
                     "[FILE HIST] %s (%d bytes, %s)",
@@ -487,279 +427,104 @@ public class ClientHandler implements Runnable {
             sendFrame(Frame.ack("OK FILE_HISTORY " + rows.size()));
         } catch (SQLException e) {
             sendFrame(Frame.error("FILE_HISTORY_FAIL"));
-            e.printStackTrace();
         }
     }
-    
+
+    /* ================= DELETE FILE (hợp nhất) ================= */
     private void handleDeleteFile(Frame f) {
         long msgId = parseLongSafe(f.body, 0L);
-        if (msgId <= 0) {
-            sendFrame(Frame.error("INVALID_FILE_ID"));
-            return;
-        }
+        if (msgId <= 0) { sendFrame(Frame.error("INVALID_FILE_ID")); return; }
 
         try {
-            boolean deleted = fileDao.deleteFileByMessageId(msgId);
+            var row = fileDao.getByMessageId(msgId);
+            boolean deleted = fileDao.deleteByMessageId(msgId);
             if (deleted) {
+                if (row != null) {
+                    File onDisk = new File(row.filePath);
+                    if (onDisk.exists()) onDisk.delete();
+                }
                 sendFrame(Frame.ack("OK FILE_DELETED"));
-
-                // Optionally broadcast to peer so their UI removes file bubble
-                Frame evt = new Frame(MessageType.DELETE_FILE, username, "", "");
-                evt.transferId = String.valueOf(msgId);
-                broadcast(evt.toString(), true);
-
-                System.out.println("[SERVER] File deleted for messageId=" + msgId);
             } else {
                 sendFrame(Frame.error("FILE_NOT_FOUND"));
             }
         } catch (SQLException e) {
-            System.err.println("[DB] File delete error: " + e.getMessage());
             sendFrame(Frame.error("DB_FILE_DELETE_FAIL"));
         }
     }
 
-    /* ================= AUDIO ================= */
-    private record AudioResult(String id, String to, String savedName, long bytes, int durationSec) {}
-    /*change*/
-    private void handleAudio(Frame f) {
+    /* ================= CALL ================= */
+    private void handleCall(Frame f) {
+        CallRouter.getInstance().route(username, f);
+    }
+
+    /* ================= DELETE MESSAGE ================= */
+    private void handleDeleteMessage(Frame f) {
         try {
-            if (f.type == MessageType.AUDIO_META) {
-                // 1️⃣ Receive and store the audio file in uploads/
-                AudioResult a = receiveAudio(f);
+            long id = parseLongSafe(f.body, 0L);
+            if (id <= 0) { sendFrame(Frame.error("BAD_ID")); return; }
+            String peer = messageDao.deleteByIdReturningPeer(id, username);
 
-                // 2️⃣ Save message and file metadata to database
-                try {
-                    // Save message record first (just like file message)
-                    Frame audioMsg = new Frame(MessageType.DM, username, a.to, "[AUDIO]");
-                    long msgId = messageDao.saveSentReturnId(audioMsg);
-
-                    // Build absolute file path for the stored audio
-                    String audioPath = new File(UPLOAD_DIR, sanitizeFilename(a.id)).getAbsolutePath();
-
-                    // Save to DB using FileDao
-                    fileDao.saveAudio(
-                            msgId,
-                            a.savedName,
-                            audioPath,
-                            "audio/wav",           // or dynamic MIME if you detect from client
-                            a.bytes,
-                            a.durationSec
-                    );
-
-                    System.out.println("[DB] Audio metadata saved: msgId=" + msgId + ", duration=" + a.durationSec + "s");
-
-                } catch (SQLException sqle) {
-                    System.err.println("[DB] Failed to save audio metadata: " + sqle.getMessage());
+            // xoá file nếu có
+            try {
+                var fileRow = fileDao.getByMessageId(id);
+                if (fileRow != null) {
+                    fileDao.deleteByMessageId(id);
+                    File toDelete = new File(fileRow.filePath);
+                    if (toDelete.exists()) toDelete.delete();
                 }
+            } catch (SQLException ignore) {}
 
-                // 3️⃣ Send confirmation ACK to the sender
-                Frame ack = Frame.ack("AUDIO_SAVED " + a.bytes + "B " + a.durationSec + "s");
-                ack.transferId = a.id;
-                sendFrame(ack);
+            if (peer == null) { sendFrame(Frame.error("DENIED_OR_NOT_FOUND")); return; }
 
-                // 4️⃣ Notify the recipient so their UI shows new audio bubble
-                notifyIncomingAudio(a);
+            Frame ack = Frame.ack("OK DELETE");
+            ack.transferId = String.valueOf(id);
+            sendFrame(ack);
 
-                System.out.println("[SERVER] AUDIO OK id=" + a.id + " -> " + a.savedName + " (" + a.bytes + "B)");
+            Frame evt = new Frame(MessageType.DELETE_MSG, username, peer, "");
+            evt.transferId = String.valueOf(id);
+            ClientHandler peerHandler = online.get(peer);
+            if (peerHandler != null) peerHandler.sendFrame(evt);
 
-            } else {
-                System.out.println("[SERVER] Unexpected AUDIO_CHUNK without META");
-            }
-
-        } catch (IOException e) {
-            sendFrame(Frame.error("AUDIO_FAIL"));
-            System.err.println("[SERVER] AUDIO FAIL: " + e.getMessage());
+        } catch (Exception e) {
+            sendFrame(Frame.error("DELETE_FAIL"));
         }
     }
-    /* ================= AUDIO HISTORY ================= */
-    private void handleAudioHistory(Frame f) {
-        int limit = 5;
-        int offset = 0;
+
+    /* ================= Helpers ================= */
+    private void broadcast(String msg, boolean excludeSelf) {
+        for (ClientHandler c : clients) {
+            if (excludeSelf && c == this) continue;
+            c.sendFrame(Frame.ack(msg));
+        }
+    }
+
+    public void sendFrame(Frame f) {
+        if (binOut == null) return;
         try {
-            if (f.body != null && !f.body.isBlank()) {
-                String body = f.body.trim();
-                String limitStr = jsonGet(body, "limit");
-                String offsetStr = jsonGet(body, "offset");
-                if (limitStr != null) limit = Integer.parseInt(limitStr);
-                if (offsetStr != null) offset = Integer.parseInt(offsetStr);
-                if (limitStr == null && offsetStr == null)
-                    limit = Integer.parseInt(body);
-            }
-        } catch (Exception ignore) {}
-
-        try {
-            var rows = fileDao.listAudiosByUserPaged(username, limit, offset);
-            for (var r : rows) {
-                String info = String.format(
-                    "[AUDIO HIST] %s (%d bytes, %ss)",
-                    r.fileName,
-                    r.fileSize,
-                    (r.durationSec != null ? r.durationSec : "n/a")
-                );
-                Frame hist = new Frame(MessageType.AUDIO_HISTORY, username, username, info);
-                hist.transferId = String.valueOf(r.id);
-                sendFrame(hist);
-            }
-            sendFrame(Frame.ack("OK AUDIO_HISTORY " + rows.size()));
-        } catch (SQLException e) {
-            sendFrame(Frame.error("AUDIO_HISTORY_FAIL"));
-            e.printStackTrace();
+            FrameIO.write(binOut, f);
+            binOut.flush();
+        } catch (Exception e) {
+            System.err.println("[SERVER] Send frame failed: " + e.getMessage());
         }
     }
 
-    /* ================= DOWNLOAD AUDIO ================= */
-    private void handleDownloadAudio(Frame f) {
-        long msgId = parseLongSafe(f.body, 0L);
-        if (msgId <= 0) {
-            sendFrame(Frame.error("INVALID_AUDIO_ID"));
-            return;
+    private void cleanup() {
+        if (username != null) {
+            CallRouter.getInstance().unregister(username, this);
+            online.remove(username, this);
+            broadcast("🔴 " + username + " left", true);
+            username = null;
         }
-
-        try {
-            var audioRow = fileDao.getAudioByMessageId(msgId);
-            if (audioRow == null) {
-                sendFrame(Frame.error("AUDIO_NOT_FOUND_DB"));
-                System.err.println("[DB] No audio record for id=" + msgId);
-                return;
-            }
-
-            File file = new File(audioRow.filePath);
-            if (!file.exists()) {
-                sendFrame(Frame.error("AUDIO_NOT_FOUND_DISK"));
-                System.err.println("[SERVER] Audio missing on disk: " + file.getAbsolutePath());
-                return;
-            }
-
-            String mime = (audioRow.mimeType != null) ? audioRow.mimeType : "audio/wav";
-            String name = (audioRow.fileName != null) ? audioRow.fileName : ("audio-" + msgId);
-
-            // send meta frame
-            Frame meta = Frame.fileMeta(username, "", name, mime, String.valueOf(msgId), file.length());
-            sendFrame(meta);
-
-            // send audio chunks
-            try (InputStream fis = new BufferedInputStream(new FileInputStream(file))) {
-                byte[] buf = new byte[Frame.CHUNK_SIZE];
-                int n, seq = 0;
-                long rem = file.length();
-                while ((n = fis.read(buf)) != -1) {
-                    rem -= n;
-                    boolean last = (rem == 0);
-                    byte[] slice = (n == buf.length) ? buf : Arrays.copyOf(buf, n);
-                    Frame ch = Frame.fileChunk(username, "", String.valueOf(msgId), seq++, last, slice);
-                    sendFrame(ch);
-                }
-            }
-
-            System.out.println("[SERVER] Audio sent successfully: " + audioRow.fileName);
-
-        } catch (SQLException e) {
-            System.err.println("[DB] Error fetching audio info: " + e.getMessage());
-            sendFrame(Frame.error("DB_ERROR_AUDIO_FETCH"));
-        } catch (IOException e) {
-            System.err.println("[SERVER] Audio download failed: " + e.getMessage());
-            sendFrame(Frame.error("DOWNLOAD_AUDIO_FAIL"));
-        }
+        clients.remove(this);
+        close();
     }
 
-    /* ================= DELETE AUDIO ================= */
-    private void handleDeleteAudio(Frame f) {
-        long msgId = parseLongSafe(f.body, 0L);
-        if (msgId <= 0) {
-            sendFrame(Frame.error("INVALID_AUDIO_ID"));
-            return;
-        }
-
-        try {
-            boolean deleted = fileDao.deleteAudioByMessageId(msgId);
-            if (deleted) {
-                sendFrame(Frame.ack("OK AUDIO_DELETED"));
-                Frame evt = new Frame(MessageType.DELETE_AUDIO, username, "", "");
-                evt.transferId = String.valueOf(msgId);
-                broadcast(evt.toString(), true);
-                System.out.println("[SERVER] Audio deleted for messageId=" + msgId);
-            } else {
-                sendFrame(Frame.error("AUDIO_NOT_FOUND"));
-            }
-        } catch (SQLException e) {
-            System.err.println("[DB] Audio delete error: " + e.getMessage());
-            sendFrame(Frame.error("DB_AUDIO_DELETE_FAIL"));
-        }
+    public void close() {
+        try { if (binIn != null) binIn.close(); } catch (Exception ignored) {}
+        try { if (binOut != null) binOut.close(); } catch (Exception ignored) {}
+        try { if (socket != null && !socket.isClosed()) socket.close(); } catch (IOException ignored) {}
     }
 
-    
-    private AudioResult receiveAudio(Frame meta) throws IOException {
-        if (!UPLOAD_DIR.exists()) UPLOAD_DIR.mkdirs();
-
-        String body = meta.body == null ? "" : meta.body;
-        String audioId = jsonGet(body, "audioId");
-        int duration = (int) parseLongSafe(jsonGet(body, "durationSec"), 0);
-        long declaredSz = parseLongSafe(jsonGet(body, "size"), 0);
-
-        if (audioId == null || audioId.isBlank()) audioId = java.util.UUID.randomUUID().toString();
-        File out = new File(UPLOAD_DIR, sanitizeFilename(audioId));
-        fileNameMap.put(audioId, "audio-" + audioId + ".aud");
-
-        long written = 0;
-        BufferedOutputStream bos = null;
-        try (FileOutputStream fo = new FileOutputStream(out)) {
-            bos = new BufferedOutputStream(fo);
-            socket.setSoTimeout(10_000);
-            int expectSeq = 0;
-            while (true) {
-                Frame ch = FrameIO.read(binIn);
-                if (ch == null || ch.type != MessageType.AUDIO_CHUNK)
-                    throw new IOException("Expected AUDIO_CHUNK");
-                if (!audioId.equals(ch.transferId))
-                    throw new IOException("Mismatched audioId");
-                if (ch.seq != expectSeq++)
-                    throw new IOException("Out-of-order chunk");
-
-                byte[] data = (ch.bin == null) ? new byte[0] : ch.bin;
-                if (written + data.length > Frame.MAX_FILE_BYTES)
-                    throw new IOException("File exceeds limit");
-                if (data.length > 0) {
-                    bos.write(data);
-                    written += data.length;
-                }
-                if (ch.last) break;
-            }
-            bos.flush();
-        } finally {
-            if (bos != null) {
-                try { bos.close(); } catch (IOException e) {
-                    System.err.println("[SERVER] Failed to close bos: " + e.getMessage());
-                }
-            }
-            socket.setSoTimeout(0);
-        }
-
-        if (declaredSz > 0 && declaredSz != written) {
-            System.out.println("[SERVER] WARN: declared=" + declaredSz + " but written=" + written);
-        }
-
-        return new AudioResult(audioId, meta.recipient, out.getName(), written, duration);
-    }
-
-    private void notifyIncomingAudio(AudioResult a) {
-        if (a.to == null || a.to.isBlank()) return;
-        ClientHandler target = online.get(a.to);
-        if (target == null) return;
-
-        String json = "{"
-                + "\"from\":\"" + escJson(username) + "\","
-                + "\"to\":\""   + escJson(a.to) + "\","
-                + "\"id\":\""   + escJson(a.id) + "\","
-                + "\"name\":\"" + escJson(a.savedName) + "\","
-                + "\"mime\":\"audio/unknown\","
-                + "\"bytes\":"  + a.bytes + ","
-                + "\"duration\":" + a.durationSec
-                + "}";
-        Frame evt = new Frame(MessageType.AUDIO_EVT, username, a.to, json);
-        target.sendFrame(evt);
-    }
-
-    /* ================== Utils ================== */
     private static String jsonGet(String json, String key) {
         if (json == null) return null;
         String kq = "\"" + key + "\"";
@@ -781,16 +546,11 @@ public class ClientHandler implements Runnable {
             return json.substring(j, end);
         }
     }
-
-    private static String pickJson(String json, String key) {
-        return jsonGet(json, key);
-    }
-
+    private static String pickJson(String json, String key) { return jsonGet(json, key); }
     private static String escJson(String s) {
         if (s == null) return "";
         return s.replace("\\", "\\\\").replace("\"", "\\\"");
     }
-
     private static String sanitizeFilename(String name) {
         if (name == null || name.isBlank()) return "file";
         name = name.replace('\\', '/');
@@ -800,58 +560,6 @@ public class ClientHandler implements Runnable {
         if (safe.equals(".") || safe.equals("..") || safe.isBlank()) safe = "file";
         return safe;
     }
-
-    /* ================= CALL ================= */
-    private void handleCall(Frame f) {
-        final var router = CallRouter.getInstance();
-        router.route(username, f);
-    }
-
-    /* ================= Helpers ================= */
-    private void broadcast(String msg, boolean excludeSelf) {
-        for (ClientHandler c : clients) {
-            if (excludeSelf && c == this) continue;
-            c.sendFrame(Frame.ack(msg));
-        }
-    }
-
-    public void sendFrame(Frame f) {
-        if (binOut == null) {
-            System.err.println("[SERVER] Cannot send frame: binOut is null");
-            return;
-        }
-        try {
-            FrameIO.write(binOut, f);
-            binOut.flush();
-        } catch (Exception e) {
-            System.err.println("[SERVER] Send frame failed: " + e.getMessage());
-            e.printStackTrace();
-        }
-    }
-
-    private void cleanup() {
-        if (username != null) {
-            CallRouter.getInstance().unregister(username, this);
-            online.remove(username, this);
-            broadcast("🔴 " + username + " left", true);
-            username = null;
-        }
-        clients.remove(this);
-        close();
-        System.out.println("⬅ Client disconnected: " + socketSafe());
-    }
-
-    public void close() {
-        try { if (binIn != null) binIn.close(); } catch (Exception ignored) {}
-        try { if (binOut != null) binOut.close(); } catch (Exception ignored) {}
-        try { if (socket != null && !socket.isClosed()) socket.close(); } catch (IOException ignored) {}
-    }
-
-    private String socketSafe() {
-        try { return String.valueOf(socket.getRemoteSocketAddress()); }
-        catch (Exception e) { return "?"; }
-    }
-
     private static long parseLongSafe(String s, long def) {
         if (s == null || s.isBlank()) return def;
         try { return Long.parseLong(s); } catch (Exception e) { return def; }

@@ -154,6 +154,22 @@ public class ClientConnection {
         f.seq = limit;
         sendFrame(f);
     }
+    
+    public void downloadFileByFileId(long fileId) throws IOException {
+        Frame req = new Frame(MessageType.DOWNLOAD_FILE, "", "", "{\"fileId\":" + fileId + "}");
+        sendFrame(req);
+    }
+
+    public void downloadFileByMsgId(long msgId) throws IOException {
+        Frame req = new Frame(MessageType.DOWNLOAD_FILE, "", "", "{\"messageId\":" + msgId + "}");
+        sendFrame(req);
+    }
+
+    public void downloadFileLegacy(String uuidOrLegacyId) throws IOException {
+        Frame req = new Frame(MessageType.DOWNLOAD_FILE, "", "", "{\"id\":\"" + uuidOrLegacyId + "\"}");
+        sendFrame(req);
+    }
+
 
     public synchronized Frame sendFileWithAck(String from, String to, File file, String mimeOrNull, String fileId, long timeoutMs)
             throws Exception {

@@ -21,6 +21,7 @@ import javafx.scene.control.*;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.*;
+import javafx.scene.media.MediaPlayer;
 import javafx.stage.Stage;
 import javafx.stage.Window;
 import server.dao.UserDAO;
@@ -89,6 +90,19 @@ public class MidController implements CallSignalListener {
     
     private final CallHandler callHandler = new CallHandler(this);
     private final Set<String> shownCallLogs = ConcurrentHashMap.newKeySet();
+    private final Map<String, HBox> pendingHistoryFileRows = new ConcurrentHashMap<>();
+    private final Map<String, MediaPlayer> videoPlayers = new ConcurrentHashMap<>();
+    
+    public Map<String, HBox> getPendingHistoryFileRows() { return pendingHistoryFileRows; }
+    
+    MediaHandler mediaHandler = new MediaHandler(this);
+    private final Map<String, Long> fileIdToSize = new ConcurrentHashMap<>();
+
+    public Map<String, Long> getFileIdToSize() { return fileIdToSize; }
+    
+	public MediaHandler getMediaHandler() {
+		return mediaHandler;
+	}
 
     public void bind(Label currentChatName, Label currentChatStatus, VBox messageContainer, TextField messageField, ImageView midHeaderAvatar) {
         this.currentChatName = currentChatName;
@@ -206,7 +220,7 @@ public class MidController implements CallSignalListener {
 
     public boolean removeMessageById(String id) {
         HBox row = findRowByUserData(id);
-        return row != null && messageContainer.getChildren().remove(row);
+        return row != null && messageContainer.getChildren().remove(row); 
     }
 
     public void showErrorAlert(String message) {
@@ -340,6 +354,21 @@ public class MidController implements CallSignalListener {
         return row;
     }
     
+    public void putVideoPlayer(String key, javafx.scene.media.MediaPlayer p) {
+        if (key == null) return;
+        var old = videoPlayers.put(key, p);
+        if (old != null) {
+            try { old.stop(); old.dispose(); } catch (Exception ignore) {}
+        }
+    }
+    public javafx.scene.media.MediaPlayer getVideoPlayer(String key) {
+        return key == null ? null : videoPlayers.get(key);
+    }
+    public void removeVideoPlayer(String key) {
+        var old = videoPlayers.remove(key);
+        if (old != null) { try { old.stop(); old.dispose(); } catch (Exception ignore) {} }
+    }
+    
     public static String formatCallDuration(long millis) {
         long totalSec = Math.max(0, millis / 1000);
         long h = totalSec / 3600;
@@ -435,4 +464,5 @@ public class MidController implements CallSignalListener {
     public void setCurrentPeerUser(User currentPeerUser) { this.currentPeerUser = currentPeerUser; }
     public void setVideoSession(LanVideoSession videoSession) { this.videoSession = videoSession; }
     public void setAudioSession(LanAudioSession audioSession) { this.audioSession = audioSession; }
+
 }
